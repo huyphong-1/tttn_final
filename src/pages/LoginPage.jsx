@@ -1,26 +1,76 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
+  const { showError, showSuccess } = useToast();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Redirect nếu đã đăng nhập
+  useEffect(() => {
+    if (user && !authLoading) {
+      console.log("User đã đăng nhập, chuyển hướng về trang chủ");
+      setLoading(false); // Reset loading state
+      nav("/", { replace: true });
+    }
+  }, [user, authLoading, nav]);
+
+  // Debug authLoading state
+  useEffect(() => {
+    console.log("AuthLoading state:", authLoading, "User:", !!user);
+  }, [authLoading, user]);
+
+  // Fallback timeout để tránh bị treo
+  useEffect(() => {
+    if (loading) {
+      const timeout = setTimeout(() => {
+        console.log("Timeout fallback - force redirect");
+        setLoading(false);
+        nav("/", { replace: true });
+      }, 5000); // 5 giây timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [loading, nav]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    if (!email.trim()) {
+      showError("Vui lòng nhập email");
+      return;
+    }
+    
+    if (!password.trim()) {
+      showError("Vui lòng nhập mật khẩu");
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log("Bắt đầu đăng nhập...");
+      
       const { error } = await signIn(email, password);
       if (error) throw error;
-      nav("/");
+      
+      console.log("Đăng nhập API thành công, đợi AuthContext cập nhật...");
+      showSuccess("Đăng nhập thành công!");
+      
+      // Không navigate ngay, để useEffect handle khi user state được cập nhật
+      // nav("/"); // Bỏ dòng này
+      
     } catch (err) {
-      alert(err.message || "Login fail");
-    } finally {
-      setLoading(false);
+      console.error("Lỗi đăng nhập:", err);
+      showError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
+      setLoading(false); // Chỉ set loading false khi có lỗi
     }
+    // Không có finally để loading vẫn true cho đến khi useEffect redirect
   };
 
   return (

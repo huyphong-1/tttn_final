@@ -1,13 +1,66 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="vi" class="">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    
+    <!-- SEO Meta Tags -->
+    <title>TechPhone - Cửa hàng điện thoại và phụ kiện chính hãng</title>
+    <meta name="description" content="Mua điện thoại iPhone, Samsung, Xiaomi chính hãng với giá tốt nhất. Bảo hành toàn quốc, trả góp 0%, freeship toàn quốc." />
+    <meta name="keywords" content="điện thoại, iPhone, Samsung, Xiaomi, phụ kiện điện thoại, cửa hàng điện thoại" />
+    <meta name="author" content="TechPhone" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="TechPhone - Cửa hàng điện thoại chính hãng" />
+    <meta property="og:description" content="Mua điện thoại iPhone, Samsung, Xiaomi chính hãng với giá tốt nhất" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://techphone.com" />
+    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:site_name" content="TechPhone" />
+    <meta property="og:locale" content="vi_VN" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TechPhone - Cửa hàng điện thoại chính hãng" />
+    <meta name="twitter:description" content="Mua điện thoại iPhone, Samsung, Xiaomi chính hãng với giá tốt nhất" />
+    <meta name="twitter:image" content="/twitter-image.jpg" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://techphone.com" />
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Theme color -->
+    <meta name="theme-color" content="#fea928" />
+    <meta name="msapplication-TileColor" content="#fea928" />
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Store",
+      "name": "TechPhone",
+      "description": "Cửa hàng điện thoại và phụ kiện chính hãng",
+      "url": "https://techphone.com",
+      "telephone": "+84-123-456-789",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "123 Đường ABC",
+        "addressLocality": "Hà Nội",
+        "addressCountry": "VN"
+      },
+      "openingHours": "Mo-Su 08:00-22:00",
+      "paymentAccepted": ["Cash", "Credit Card", "Bank Transfer"],
+      "priceRange": "$$"
+    }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" role="main"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
