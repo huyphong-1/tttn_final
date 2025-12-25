@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
+import config from '../config/environment';
 
-// Lấy URL và Anon Key từ biến môi trường
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Lấy URL và Anon Key từ config
+const supabaseUrl = config.SUPABASE_URL;
+const supabaseAnonKey = config.SUPABASE_ANON_KEY;
 
 // Kiểm tra sự tồn tại của các biến môi trường
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Missing Supabase env vars:", { supabaseUrl, supabaseAnonKey });
+  console.error("Missing Supabase configuration:", { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey });
 }
 
 // Tạo Supabase client

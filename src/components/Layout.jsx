@@ -3,15 +3,19 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import SkipLink from "./Accessibility/SkipLink";
 
-export default function Layout() {
+const Layout = () => {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+    <div className="bg-slate-950 text-slate-50 min-h-screen">
+      <SkipLink />
       <Navbar />
-      <div className="flex-1">
+      <main id="main-content" tabIndex="-1">
         <Outlet />
-      </div>
+      </main>
       <Footer />
     </div>
   );
-}
+};
+
+export default Layout;

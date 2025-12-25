@@ -7,8 +7,9 @@ export default function AdminRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-12 text-slate-300">
-        Đang kiểm tra quyền...
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <p className="ml-4 text-slate-300">Đang kiểm tra quyền...</p>
       </div>
     );
   }
