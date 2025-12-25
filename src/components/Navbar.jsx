@@ -1,13 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import { useWishlist } from "../context/WishlistContext";
 import { IoMdSearch } from "react-icons/io";
 import { FaShoppingCart } from "react-icons/fa";  // Sử dụng đúng FaShoppingCart
 import { FaCaretDown } from "react-icons/fa";
-import { FaHistory } from "react-icons/fa";  // Thêm icon History từ react-icons
+import { FaHistory, FaHeart } from "react-icons/fa";  // Thêm icon History và Heart từ react-icons
 import DarkMode from "./DarkMode";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { AdminOnly } from "./Guards/RoleGuard";
+import PermissionGuard from "./Guards/PermissionGuard";
+import { PERMISSIONS } from "../config/permissions";
 
 const Menu = [
   { id: 1, name: "Điện thoại", link: "/phones" },
@@ -21,6 +25,7 @@ const formatPrice = (n) =>
 
 const Navbar = ({ handleOrderPopup }) => {
   const { cartCount } = useCart();
+  const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   
@@ -29,34 +34,42 @@ const Navbar = ({ handleOrderPopup }) => {
   const [results, setResults] = useState([]);
   const [openSuggest, setOpenSuggest] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // ✅ Dropdown click-state (CÁCH A)
   const [openTrending, setOpenTrending] = useState(false);
   const trendingRef = useRef(null);
 
   // Hàm handle đăng xuất
-const handleSignOut = async () => {
-  // Lấy user_id từ Supabase Auth (user hiện tại)
-  const userId = supabase.auth.user()?.id;
-
-  if (userId) {
-    // Cập nhật trạng thái người dùng trong cơ sở dữ liệu (bảng profiles)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_active: false }) // Cập nhật is_active thành false khi đăng xuất
-      .eq('user_id', userId); // Sử dụng user_id thực tế
-
-    if (error) {
-      console.error("Error updating user status:", error);
+  const handleSignOut = async () => {
+    if (isSigningOut) return; // Prevent double click
+    
+    try {
+      setIsSigningOut(true);
+      console.log("Bắt đầu đăng xuất...");
+      
+      // Sử dụng signOut từ AuthContext
+      await signOut();
+      
+      console.log("Đăng xuất thành công, chuyển hướng...");
+      
+      // Chuyển hướng về trang chủ
+      navigate("/", { replace: true });
+      
+      // Reload page sau một chút để đảm bảo state được reset
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+      
+    } catch (error) {
+      console.error("Lỗi khi đăng xuất:", error);
+      // Vẫn chuyển hướng về trang chủ ngay cả khi có lỗi
+      navigate("/", { replace: true });
+      window.location.reload();
+    } finally {
+      setIsSigningOut(false);
     }
-  } else {
-    console.error("Không tìm thấy user_id trong Supabase Auth");
-  }
-
-  // Tiến hành đăng xuất
-  await supabase.auth.signOut();
-  navigate("/login");  // Điều hướng người dùng về trang đăng nhập sau khi đăng xuất
-};
+  };
 
   // ✅ Click outside => đóng dropdown Trending
   useEffect(() => {
@@ -187,6 +200,37 @@ const handleSignOut = async () => {
               )}
             </div>
 
+            {/* Wishlist & Cart Desktop - Chỉ hiển thị cho user đã đăng nhập */}
+            <PermissionGuard permission={PERMISSIONS.WISHLIST_MANAGE}>
+              <div className="hidden sm:flex items-center gap-3">
+                <Link
+                  to="/wishlist"
+                  className="relative p-2 text-slate-300 hover:text-red-400 transition-colors"
+                  title="Danh sách yêu thích"
+                >
+                  <FaHeart className="text-lg" />
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+                
+                <Link
+                  to="/cart"
+                  className="relative p-2 text-slate-300 hover:text-blue-400 transition-colors"
+                  title="Giỏ hàng"
+                >
+                  <FaShoppingCart className="text-lg" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
+              </div>
+            </PermissionGuard>
+
             <DarkMode />
             {/* Auth buttons */}
               {!user ? (
@@ -207,27 +251,53 @@ const handleSignOut = async () => {
                 </div>
               ) : (
                 <div className="hidden sm:flex items-center gap-2 text-xs">
-                  <span className="text-slate-300 truncate max-w-[120px]">
+                  <Link
+                    to="/profile"
+                    className="text-slate-300 hover:text-blue-400 truncate max-w-[120px] transition"
+                  >
                     {user.email}
-                  </span>
+                  </Link>
+
+                  {/* Admin Dashboard Link - Chỉ hiển thị cho admin */}
+                  <AdminOnly>
+                    <Link
+                      to="/admin"
+                      className="px-3 py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white transition"
+                    >
+                      Admin
+                    </Link>
+                  </AdminOnly>
 
                   <button
                     onClick={handleSignOut}
-                    className="px-3 py-1.5 rounded-full border border-slate-700 hover:border-red-400 hover:text-red-400 transition"
+                    disabled={isSigningOut}
+                    className={`px-3 py-1.5 rounded-full border border-slate-700 hover:border-red-400 hover:text-red-400 transition ${
+                      isSigningOut ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
-                    Đăng xuất
+                    {isSigningOut ? 'Đang xuất...' : 'Đăng xuất'}
                   </button>
                 </div>
               )}
 
-            {/* Cart mobile */}
-            <Link
-              to="/cart"
-              className="sm:hidden inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500 text-xs font-medium"
-            >
-              <FaShoppingCart />
-              <span>{cartCount}</span>
-            </Link>
+            {/* Wishlist & Cart mobile - Chỉ hiển thị cho user có quyền */}
+            <PermissionGuard permission={PERMISSIONS.WISHLIST_MANAGE}>
+              <div className="sm:hidden flex items-center gap-2">
+                <Link
+                  to="/wishlist"
+                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full bg-red-500 text-xs font-medium"
+                >
+                  <FaHeart />
+                </Link>
+                <Link
+                  to="/cart"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500 text-xs font-medium"
+                >
+                  <FaShoppingCart />
+                  <span>{cartCount}</span>
+                </Link>
+              </div>
+            </PermissionGuard>
           </div>
         </div>
       </div>
