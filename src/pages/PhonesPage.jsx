@@ -8,12 +8,12 @@ const formatPrice = (n) =>
 
 export default function PhonesPage() {
   const { addItem } = useCart();
-  const [phones, setPhones] = useState([]); // Chỉnh sửa ở đây
-  const [loading, setLoading] = useState(true); // Chỉnh sửa ở đây
+  const [phones, setPhones] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const handleAdd = (p) => {
     addItem({
-      id: `phone-${p.id}`, // tránh trùng với acc-...
+      id: `phone-${p.id}`,
       name: p.name,
       price: p.price,
       image: p.image,
@@ -59,11 +59,6 @@ export default function PhonesPage() {
       </div>
 
       {/* Grid */}
-      {loading ? (
-        <div className="text-sm text-slate-400">Đang tải sản phẩm...</div>
-      ) : phones.length === 0 ? (
-        <div className="text-sm text-slate-400">Chưa có sản phẩm nào.</div>
-      ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {phones.map((p) => (
             <div
@@ -99,7 +94,6 @@ export default function PhonesPage() {
             </div>
           ))}
         </div>
-      )}
     </main>
   );
 }
