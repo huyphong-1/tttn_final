@@ -4,7 +4,7 @@ import { FiCreditCard, FiTruck, FiMapPin, FiUser, FiMail, FiPhone } from 'react-
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { createOrderRecord, supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -20,6 +20,8 @@ export default function CheckoutPage() {
   const [verifying, setVerifying] = useState(false);
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState(null);
+  const [verificationError, setVerificationError] = useState(null);
   const [formData, setFormData] = useState({
     fullName: profile?.full_name || '',
     email: user?.email || '',
@@ -58,8 +60,24 @@ export default function CheckoutPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
-      showError('Vui long dien day du thong tin bat buoc');
+    // Validation chi tiết hơn
+    if (!formData.fullName?.trim()) {
+      showError('Vui lòng nhập họ và tên');
+      return;
+    }
+    
+    if (!formData.phone?.trim()) {
+      showError('Vui lòng nhập số điện thoại');
+      return;
+    }
+    
+    if (!formData.address?.trim()) {
+      showError('Vui lòng nhập địa chỉ giao hàng');
+      return;
+    }
+    
+    if (!formData.email?.trim()) {
+      showError('Email không được để trống');
       return;
     }
 
@@ -94,7 +112,8 @@ export default function CheckoutPage() {
         }))
       };
 
-      const savedOrder = await createOrderRecord({
+      // Tạo order trực tiếp với Supabase - chỉ dùng các cột có trong database
+      const orderPayload = {
         user_id: user?.id || null,
         order_number: orderDetails.orderNumber,
         total_amount: cartTotal,
@@ -102,15 +121,23 @@ export default function CheckoutPage() {
         status: 'pending',
         payment_status: formData.paymentMethod === 'cod' ? 'pending' : 'paid',
         payment_method: formData.paymentMethod,
-        customer_name: formData.fullName,
-        customer_email: formData.email,
-        customer_phone: formData.phone,
-        phone: formData.phone,
-        shipping_address: formData.address,
-        shipping_city: formData.city,
-        notes: formData.notes,
-        items: orderDetails.items,
-      });
+        customer_name: formData.fullName.trim(),
+        customer_email: formData.email.trim(),
+        phone: formData.phone.trim(), // Sửa từ customer_phone thành phone
+        address: `${formData.address.trim()}, ${formData.city.trim()}`, // Gộp address và city
+        notes: formData.notes?.trim() || '',
+        items: JSON.stringify(orderDetails.items), // Convert items to JSON string
+      };
+      
+      const { data: savedOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert([orderPayload])
+        .select()
+        .single();
+        
+      if (orderError) {
+        throw orderError;
+      }
 
       setVerifying(true);
       const verified = await verifyOrderCreation(orderDetails.orderNumber);
