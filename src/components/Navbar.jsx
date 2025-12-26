@@ -27,7 +27,8 @@ const Navbar = ({ handleOrderPopup }) => {
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile, role, isAdmin } = useAuth();
+  
   
   // ✅ Search state
   const [keyword, setKeyword] = useState("");
@@ -285,6 +286,7 @@ const Navbar = ({ handleOrderPopup }) => {
                       Admin
                     </Link>
                   </AdminOnly>
+                  
 
                   <button
                     onClick={handleSignOut}

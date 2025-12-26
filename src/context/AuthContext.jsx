@@ -9,6 +9,7 @@ import {
   isUser,
   isGuest,
 } from "../config/permissions";
+import { isAdminEmail } from "../config/adminConfig";
 
 const AuthContext = createContext(null);
 
@@ -39,11 +40,14 @@ export function AuthProvider({ children }) {
       }
 
       if (!data) {
+        // Kiểm tra xem có phải admin email không
+        const isAdmin = isAdminEmail(authUser.email);
+        
         const defaultProfile = {
           id: userId,
           email: authUser.email || "",
           full_name: authUser.user_metadata?.full_name || "",
-          role: ROLES.USER,
+          role: isAdmin ? ROLES.ADMIN : ROLES.USER,
           status: "active",
         };
 
@@ -67,9 +71,32 @@ export function AuthProvider({ children }) {
           setProfile(defaultProfile);
           return;
         }
+      } else {
+        // Kiểm tra xem profile có role admin chưa nếu là admin email
+        if (isAdminEmail(authUser.email) && data.role !== ROLES.ADMIN) {
+          
+          try {
+            const { data: updated, error: updateError } = await supabase
+              .from("profiles")
+              .update({ role: ROLES.ADMIN })
+              .eq("id", userId)
+              .select()
+              .single();
+              
+            if (updateError) {
+              console.error("Unable to update profile role:", updateError.message);
+              setProfile(data);
+            } else {
+              setProfile(updated);
+            }
+          } catch (updateErr) {
+            console.error("Error updating profile:", updateErr);
+            setProfile(data);
+          }
+        } else {
+          setProfile(data);
+        }
       }
-
-      setProfile(data);
     } catch (error) {
       console.error("fetchProfile catch error:", error);
       setProfile(null);
