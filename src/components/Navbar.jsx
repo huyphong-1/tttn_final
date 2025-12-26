@@ -16,8 +16,8 @@ import { PERMISSIONS } from "../config/permissions";
 const Menu = [
   { id: 1, name: "Điện thoại", link: "/phones" },
   { id: 2, name: "Phụ kiện", link: "/accessories" },
-  { id: 3, name: "Khuyến mãi", link: "/sale" },
-  { id: 4, name: "Hỗ trợ", link: "/support" },
+  { id: 3, name: "Máy tính bảng", link: "/tablets" },
+  { id: 4, name: "Máy cũ", link: "/used" },
 ];
 
 const formatPrice = (n) =>
@@ -46,26 +46,17 @@ const Navbar = ({ handleOrderPopup }) => {
     
     try {
       setIsSigningOut(true);
-      console.log("Bắt đầu đăng xuất...");
       
       // Sử dụng signOut từ AuthContext
       await signOut();
       
-      console.log("Đăng xuất thành công, chuyển hướng...");
-      
       // Chuyển hướng về trang chủ
       navigate("/", { replace: true });
-      
-      // Reload page sau một chút để đảm bảo state được reset
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
       
     } catch (error) {
       console.error("Lỗi khi đăng xuất:", error);
       // Vẫn chuyển hướng về trang chủ ngay cả khi có lỗi
       navigate("/", { replace: true });
-      window.location.reload();
     } finally {
       setIsSigningOut(false);
     }
@@ -122,8 +113,15 @@ const Navbar = ({ handleOrderPopup }) => {
     return () => clearTimeout(t);
   }, [keyword]);
 
+  const submitSearch = (term) => {
+    const query = term.trim();
+    if (!query) return;
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setOpenSuggest(false);
+  };
+
   const goToProduct = (p) => {
-    navigate(`/products/${p.id}`);
+    navigate(`/product/${p.id}`);
     setOpenSuggest(false);
     setKeyword("");
   };
@@ -136,10 +134,10 @@ const Navbar = ({ handleOrderPopup }) => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center text-sm font-bold">
-              TP
+              DV
             </div>
             <div className="text-left">
-              <p className="font-semibold text-sm">TechPhone</p>
+              <p className="font-semibold text-sm">Di Động Việt</p>
               <p className="text-[11px] text-slate-400">
                 Điện thoại chính hãng - Giá tốt
               </p>
@@ -149,7 +147,13 @@ const Navbar = ({ handleOrderPopup }) => {
           {/* Search + Order + Darkmode + Cart mobile */}
           <div className="flex items-center gap-3">
             {/* Search box + dropdown */}
-            <div className="hidden md:block relative">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitSearch(keyword);
+              }}
+              className="hidden md:block relative"
+            >
               <input
                 type="text"
                 value={keyword}
@@ -161,9 +165,12 @@ const Navbar = ({ handleOrderPopup }) => {
                 placeholder="Tìm theo tên điện thoại..."
                 className="w-52 md:w-64 bg-slate-900 border border-slate-700 rounded-full px-3 py-1.5 pr-8 text-xs outline-none focus:border-blue-500"
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-lg"
+              >
                 <IoMdSearch />
-              </span>
+              </button>
 
               {openSuggest && (
                 <div className="absolute top-full left-0 mt-2 w-full rounded-2xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden z-[9999]">
@@ -171,7 +178,7 @@ const Navbar = ({ handleOrderPopup }) => {
                     <div className="p-3 text-xs text-slate-400">Đang tìm...</div>
                   ) : results.length === 0 ? (
                     <div className="p-3 text-xs text-slate-400">
-                      Không thấy sản phẩm phù hợp 🥲
+                      Không thấy sản phẩm phù hợp
                     </div>
                   ) : (
                     <ul className="divide-y divide-slate-800">
@@ -186,7 +193,7 @@ const Navbar = ({ handleOrderPopup }) => {
                           </p>
                           <p className="text-[11px] text-slate-400 flex items-center justify-between gap-2">
                             <span className="truncate">
-                              {p.category || "Sản phẩm"}
+                              {p.brand || p.category || "Sản phẩm"}
                             </span>
                             <span className="text-blue-400 font-medium">
                               {formatPrice(p.price)}
@@ -194,11 +201,22 @@ const Navbar = ({ handleOrderPopup }) => {
                           </p>
                         </li>
                       ))}
+                      {keyword.trim() && (
+                        <li className="p-3">
+                          <button
+                            type="button"
+                            onMouseDown={() => submitSearch(keyword)}
+                            className="w-full text-xs px-3 py-2 rounded-full border border-slate-700 hover:border-blue-500 text-slate-200 hover:text-blue-400 transition"
+                          >
+                            Xem tất cả kết quả
+                          </button>
+                        </li>
+                      )}
                     </ul>
                   )}
                 </div>
               )}
-            </div>
+            </form>
 
             {/* Wishlist & Cart Desktop - Chỉ hiển thị cho user đã đăng nhập */}
             <PermissionGuard permission={PERMISSIONS.WISHLIST_MANAGE}>
@@ -379,14 +397,6 @@ const Navbar = ({ handleOrderPopup }) => {
             </li>
           </ul>
 
-          {/* Nút giỏ hàng desktop */}
-          <Link
-            to="/cart"
-            className="hidden sm:inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500 text-xs font-medium hover:bg-blue-600"
-          >
-            <FaShoppingCart />
-            <span>Giỏ hàng ({cartCount})</span>
-          </Link>
         </div>
       </div>
     </div>

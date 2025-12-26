@@ -4,7 +4,7 @@ const Footer = () => {
     <footer className="bg-[#020617] border-t border-slate-800 mt-16 py-10 text-slate-400">
       <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
-          <h3 className="text-white font-semibold mb-2">TechPhone Store</h3>
+          <h3 className="text-white font-semibold mb-2">DiĐộngViệt Store</h3>
           <p className="text-sm">
             Chuyên điện thoại chính hãng, giá tốt cho sinh viên.
           </p>
@@ -32,7 +32,7 @@ const Footer = () => {
       </div>
 
       <p className="text-center text-xs text-slate-500 mt-8">
-        © 2025 TechPhone. All rights reserved.
+        DiĐộngViệt Store © 2030.
       </p>
     </footer>
   );

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { useCart } from "../../context/CartContext";
 
 const ProductsPage = () => {
@@ -29,8 +30,16 @@ const ProductsPage = () => {
             key={p.id}
             className="bg-slate-900 p-4 rounded-lg shadow border border-slate-700"
           >
-            <img src={p.image} alt={p.name} className="rounded mb-3" />
-            <h2 className="font-semibold text-lg">{p.name}</h2>
+            <Link to={`/product/${p.id}`} className="block rounded overflow-hidden mb-3">
+              <img
+                src={p.image}
+                alt={p.name}
+                className="w-full h-60 object-cover transition duration-300 hover:scale-105"
+              />
+            </Link>
+            <Link to={`/product/${p.id}`}>
+              <h2 className="font-semibold text-lg hover:text-blue-400 transition">{p.name}</h2>
+            </Link>
             <p className="text-blue-400 font-bold">
               {p.price.toLocaleString("vi-VN")}₫
             </p>

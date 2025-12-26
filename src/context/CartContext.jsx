@@ -7,6 +7,9 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "./AuthContext";
+import { useToast } from "./ToastContext";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "shopsy_cart";
@@ -25,6 +28,10 @@ const readCartFromStorage = () => {
 
 export const CartProvider = ({ children }) => {
   const [items, setItems] = useState(readCartFromStorage);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const { showInfo } = useToast();
 
   // lưu vào localStorage mỗi khi giỏ thay đổi
   useEffect(() => {
@@ -35,22 +42,33 @@ export const CartProvider = ({ children }) => {
     }
   }, [items]);
 
-  const addItem = useCallback((product, quantity = 1) => {
-    if (!product) return;
+  const addItem = useCallback(
+    (product, quantity = 1) => {
+      if (!product) return;
 
-    setItems((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
+      if (!user) {
+        showInfo?.("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
+        navigate("/login", {
+          state: { from: location.pathname + location.search },
+        });
+        return;
       }
 
-      return [...prev, { ...product, quantity }];
-    });
-  }, []);
+      setItems((prev) => {
+        const existing = prev.find((item) => item.id === product.id);
+        if (existing) {
+          return prev.map((item) =>
+            item.id === product.id
+              ? { ...item, quantity: item.quantity + quantity }
+              : item
+          );
+        }
+
+        return [...prev, { ...product, quantity }];
+      });
+    },
+    [user, showInfo, navigate, location.pathname, location.search]
+  );
 
   const updateQty = useCallback((itemId, delta) => {
     setItems((prev) =>

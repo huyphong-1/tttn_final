@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 
 const SEOHead = ({ 
-  title = "TechPhone - Cửa hàng điện thoại chính hãng",
-  description = "Mua điện thoại iPhone, Samsung, Xiaomi chính hãng với giá tốt nhất. Bảo hành toàn quốc, trả góp 0%, freeship toàn quốc.",
+  title = "Di Động Việt - Cửa hàng điện thoại chính hãng",
+  description = "Mua điện thoại chính hãng với giá tốt nhất. Bảo hành toàn quốc, trả góp 0%, freeship toàn quốc.",
   keywords = "điện thoại, iPhone, Samsung, Xiaomi, phụ kiện điện thoại",
   image = "/og-image.jpg",
-  url = "https://techphone.com",
+  url = "https://didongviet.com",
   type = "website"
 }) => {
   useEffect(() => {

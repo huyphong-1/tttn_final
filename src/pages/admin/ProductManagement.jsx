@@ -11,7 +11,7 @@ import {
   FiX
 } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
-import { productsAPI } from '../../services/api';
+import { supabase } from '../../lib/supabase';
 import { validateProduct } from '../../utils/validation';
 
 const ProductManagement = () => {
@@ -26,7 +26,7 @@ const ProductManagement = () => {
     name: '',
     description: '',
     price: '',
-    category: '',
+    phones: '',
     stock: '',
     image: '',
     brand: '',
@@ -52,41 +52,15 @@ const ProductManagement = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      // Mock data - replace with real API call
-      const mockProducts = [
-        {
-          id: 1,
-          name: 'iPhone 15 Pro Max 256GB',
-          description: 'iPhone mới nhất với chip A17 Pro',
-          price: 31990000,
-          category: 'phones',
-          stock: 50,
-          image: '/phones/iphone15pm.jpg',
-          brand: 'Apple',
-          specifications: 'A17 Pro, 256GB, 6.7 inch',
-          discount: 5,
-          featured: true,
-          status: 'active',
-          created_at: '2024-12-20'
-        },
-        {
-          id: 2,
-          name: 'Samsung Galaxy S24 Ultra',
-          description: 'Flagship Android với S Pen',
-          price: 28990000,
-          category: 'phones',
-          stock: 30,
-          image: '/phones/s24ultra.jpg',
-          brand: 'Samsung',
-          specifications: 'Snapdragon 8 Gen 3, 512GB',
-          discount: 10,
-          featured: true,
-          status: 'active',
-          created_at: '2024-12-18'
-        }
-      ];
-      setProducts(mockProducts);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
     } catch (error) {
+      console.error(error);
       showError('Lỗi khi tải danh sách sản phẩm');
     } finally {
       setLoading(false);
@@ -104,34 +78,51 @@ const ProductManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Validate form data
       validateProduct(formData);
 
       if (editingProduct) {
-        // Update product
-        const updatedProducts = products.map(p => 
-          p.id === editingProduct.id 
-            ? { ...p, ...formData, price: Number(formData.price), stock: Number(formData.stock) }
-            : p
-        );
-        setProducts(updatedProducts);
-        showSuccess('Cập nhật sản phẩm thành công!');
-      } else {
-        // Add new product
-        const newProduct = {
+        const payload = {
           ...formData,
-          id: Date.now(),
           price: Number(formData.price),
           stock: Number(formData.stock),
-          created_at: new Date().toISOString().split('T')[0]
+          discount: Number(formData.discount) || 0,
+          featured: Boolean(formData.featured),
+          status: formData.status || 'active'
         };
-        setProducts(prev => [newProduct, ...prev]);
-        showSuccess('Thêm sản phẩm thành công!');
+        const { data, error } = await supabase
+          .from('products')
+          .update(payload)
+          .eq('id', editingProduct.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        setProducts(prev => prev.map(p => (p.id === editingProduct.id ? data : p)));
+        showSuccess('C?p nh?t s?n ph?m th?nh c?ng!');
+      } else {
+        const payload = {
+          ...formData,
+          price: Number(formData.price),
+          stock: Number(formData.stock),
+          discount: Number(formData.discount) || 0,
+          featured: Boolean(formData.featured),
+          status: formData.status || 'active'
+        };
+        const { data, error } = await supabase
+          .from('products')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setProducts(prev => [data, ...prev]);
+        showSuccess('Th?m s?n ph?m th?nh c?ng!');
       }
 
       resetForm();
     } catch (error) {
-      showError(error.message || 'Có lỗi xảy ra');
+      console.error(error);
+      showError(error.message || 'C? l?i x?y ra');
     }
   };
 
@@ -154,12 +145,15 @@ const ProductManagement = () => {
   };
 
   const handleDelete = async (productId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+    if (window.confirm('B?n c? ch?c ch?n mu?n x?a s?n ph?m n?y?')) {
       try {
+        const { error } = await supabase.from('products').delete().eq('id', productId);
+        if (error) throw error;
         setProducts(prev => prev.filter(p => p.id !== productId));
-        showSuccess('Xóa sản phẩm thành công!');
+        showSuccess('X?a s?n ph?m th?nh c?ng!');
       } catch (error) {
-        showError('Lỗi khi xóa sản phẩm');
+        console.error(error);
+        showError('L?i khi x?a s?n ph?m');
       }
     }
   };

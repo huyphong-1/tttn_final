@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiCreditCard, FiTruck, FiMapPin, FiUser, FiMail, FiPhone } from 'react-icons/fi';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { createOrderRecord, supabase } from '../lib/supabase';
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -13,8 +14,12 @@ export default function CheckoutPage() {
   const { user, profile } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+  const orderPlacedRef = useRef(false);
   
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [paymentVerified, setPaymentVerified] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState('');
   const [formData, setFormData] = useState({
     fullName: profile?.full_name || '',
     email: user?.email || '',
@@ -26,7 +31,7 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    if (items.length === 0) {
+    if (items.length === 0 && !orderPlacedRef.current) {
       navigate('/cart');
     }
   }, [items, navigate]);
@@ -39,29 +44,105 @@ export default function CheckoutPage() {
     }));
   };
 
+  const verifyOrderCreation = useCallback(async (orderNumber) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('order_number', orderNumber)
+      .maybeSingle();
+
+    if (error) throw error;
+    return Boolean(data?.id);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.fullName.trim() || !formData.phone.trim() || !formData.address.trim()) {
-      showError('Vui lòng điền đầy đủ thông tin bắt buộc');
+      showError('Vui long dien day du thong tin bat buoc');
       return;
     }
 
     try {
       setLoading(true);
+      setVerifying(false);
+      setPaymentVerified(false);
+      setVerificationMessage('');
       
-      // Mock order creation - replace with real API
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      showSuccess('Đặt hàng thành công! Chúng tôi sẽ liên hệ với bạn sớm.');
+      const orderDetails = {
+        orderNumber: `TP${Date.now()}`,
+        placedAt: new Date().toISOString(),
+        estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        total: cartTotal,
+        shippingFee: 0,
+        paymentMethod: formData.paymentMethod,
+        notes: formData.notes,
+        customer: {
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+        },
+        items: items.map(item => ({
+          id: item.id,
+          productId: item.productId || item.id,
+          name: item.name,
+          image: item.image,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      };
+
+      const savedOrder = await createOrderRecord({
+        user_id: user?.id || null,
+        order_number: orderDetails.orderNumber,
+        total_amount: cartTotal,
+        shipping_fee: 0,
+        status: 'pending',
+        payment_status: formData.paymentMethod === 'cod' ? 'pending' : 'paid',
+        payment_method: formData.paymentMethod,
+        customer_name: formData.fullName,
+        customer_email: formData.email,
+        customer_phone: formData.phone,
+        phone: formData.phone,
+        shipping_address: formData.address,
+        shipping_city: formData.city,
+        notes: formData.notes,
+        items: orderDetails.items,
+      });
+
+      setVerifying(true);
+      const verified = await verifyOrderCreation(orderDetails.orderNumber);
+      setVerifying(false);
+
+      if (!verified || !savedOrder?.id) {
+        setVerificationMessage('Khong the xac thuc thanh toan. Vui long thu lai.');
+        throw new Error('Order verification failed');
+      }
+
+      setPaymentVerified(true);
+      setVerificationMessage('Thanh toan da duoc xac thuc thanh cong.');
+
+      try {
+        localStorage.setItem("lastOrder", JSON.stringify(orderDetails));
+      } catch (storageError) {
+        console.warn("Cannot persist last order:", storageError);
+      }
+
+      showSuccess('Đặt hàng và xác thực thanh toán thành công.');
+      orderPlacedRef.current = true;
       clearCart();
-      navigate('/order-history');
+      navigate('/checkout/confirmation', { state: { order: orderDetails } });
     } catch (error) {
       showError('Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
     } finally {
       setLoading(false);
+      setVerifying(false);
     }
   };
+
+
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -70,7 +151,7 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Form thông tin */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
             {/* Thông tin giao hàng */}
             <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
@@ -266,12 +347,19 @@ export default function CheckoutPage() {
               type="submit"
               form="checkout-form"
               disabled={loading}
-              onClick={handleSubmit}
               className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed rounded-lg text-white font-semibold transition-colors"
             >
-              {loading ? 'Đang xử lý...' : 'Đặt hàng ngay'}
+              {loading ? 'Đang xử lí...' : 'Đặt hàng ngay'}
             </button>
-            
+
+            {verifying}
+            {paymentVerified && verificationMessage && (
+              <p className="text-xs text-emerald-400 text-center mt-3">{verificationMessage}</p>
+            )}
+            {!paymentVerified && verificationMessage && !verifying && (
+              <p className="text-xs text-red-400 text-center mt-3">{verificationMessage}</p>
+            )}
+
             <p className="text-slate-400 text-xs text-center mt-4">
               Bằng cách đặt hàng, bạn đồng ý với điều khoản sử dụng của chúng tôi
             </p>

@@ -15,6 +15,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES, PERMISSIONS } from '../../config/permissions';
 import PermissionGuard from '../../components/Guards/PermissionGuard';
+import { supabase } from '../../lib/supabase';
 
 const UserManagement = () => {
   const { showSuccess, showError } = useToast();
@@ -34,45 +35,38 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      // Mock data - replace with real API call
-      const mockUsers = [
-        {
-          id: 1,
-          email: 'admin@techphone.com',
-          full_name: 'Admin User',
-          role: ROLES.ADMIN,
-          status: 'active',
-          created_at: '2024-01-15',
-          last_login: '2024-12-25',
-          orders_count: 0,
-          total_spent: 0
-        },
-        {
-          id: 2,
-          email: 'user1@example.com',
-          full_name: 'Nguyễn Văn A',
-          role: ROLES.USER,
-          status: 'active',
-          created_at: '2024-02-20',
-          last_login: '2024-12-24',
-          orders_count: 5,
-          total_spent: 15000000
-        },
-        {
-          id: 3,
-          email: 'user2@example.com',
-          full_name: 'Trần Thị B',
-          role: ROLES.USER,
-          status: 'inactive',
-          created_at: '2024-03-10',
-          last_login: '2024-12-20',
-          orders_count: 2,
-          total_spent: 8500000
-        }
-      ];
-      setUsers(mockUsers);
+      const [
+        { data: profileData, error: profileError },
+        { data: ordersData, error: ordersError }
+      ] = await Promise.all([
+        supabase.from('profiles').select('id, email, full_name, role, status, created_at, last_login'),
+        supabase.from('orders').select('id, user_id, total_amount, status')
+      ]);
+
+      if (profileError) throw profileError;
+      if (ordersError) throw ordersError;
+
+      const orderMap = (ordersData || []).reduce((acc, order) => {
+        const key = order.user_id;
+        if (!key) return acc;
+        if (!acc[key]) acc[key] = { count: 0, total: 0 };
+        acc[key].count += 1;
+        acc[key].total += Number(order.total_amount || 0);
+        return acc;
+      }, {});
+
+      const normalizedUsers = (profileData || []).map((profile) => ({
+        ...profile,
+        role: profile.role || ROLES.USER,
+        status: profile.status || 'active',
+        orders_count: orderMap[profile.id]?.count || 0,
+        total_spent: orderMap[profile.id]?.total || 0
+      }));
+
+      setUsers(normalizedUsers);
     } catch (error) {
-      showError('Lỗi khi tải danh sách người dùng');
+      console.error(error);
+      showError('L?i khi t?i danh s?ch ng??i d?ng');
     } finally {
       setLoading(false);
     }
@@ -80,70 +74,111 @@ const UserManagement = () => {
 
   const handleRoleChange = async (userId, newRole) => {
     try {
-      // API call to update user role
-      const updatedUsers = users.map(user => 
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+      if (error) throw error;
+
+      const updatedUsers = users.map(user =>
         user.id === userId ? { ...user, role: newRole } : user
       );
       setUsers(updatedUsers);
-      showSuccess('Cập nhật quyền người dùng thành công!');
+      showSuccess('C?p nh?t quy?n ng??i d?ng th?nh c?ng!');
     } catch (error) {
-      showError('Lỗi khi cập nhật quyền người dùng');
+      console.error(error);
+      showError('L?i khi c?p nh?t quy?n ng??i d?ng');
     }
   };
 
   const handleStatusChange = async (userId, newStatus) => {
     try {
-      const updatedUsers = users.map(user => 
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus })
+        .eq('id', userId);
+      if (error) throw error;
+
+      const updatedUsers = users.map(user =>
         user.id === userId ? { ...user, status: newStatus } : user
       );
       setUsers(updatedUsers);
-      showSuccess(`${newStatus === 'active' ? 'Kích hoạt' : 'Vô hiệu hóa'} người dùng thành công!`);
+      showSuccess(
+        `${newStatus === 'active' ? 'Kich hoat' : 'Vo hieu hoa'} nguoi dung thanh cong!`
+      );
     } catch (error) {
-      showError('Lỗi khi cập nhật trạng thái người dùng');
+      console.error(error);
+      showError('L?i khi c?p nh?t tr?ng th?i ng??i d?ng');
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+    if (window.confirm('B?n c? ch?c ch?n mu?n x?a ng??i d?ng n?y?')) {
       try {
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        if (error) throw error;
         setUsers(prev => prev.filter(user => user.id !== userId));
-        showSuccess('Xóa người dùng thành công!');
+        showSuccess('X?a ng??i d?ng th?nh c?ng!');
       } catch (error) {
-        showError('Lỗi khi xóa người dùng');
+        console.error(error);
+        showError('L?i khi x?a ng??i d?ng');
       }
     }
   };
 
   const handleBulkAction = async (action) => {
     if (selectedUsers.length === 0) {
-      showError('Vui lòng chọn ít nhất một người dùng');
+      showError('Vui l?ng ch?n ?t nh?t m?t ng??i d?ng');
       return;
     }
 
     try {
       switch (action) {
-        case 'activate':
-          setUsers(prev => prev.map(user => 
-            selectedUsers.includes(user.id) ? { ...user, status: 'active' } : user
-          ));
-          showSuccess(`Kích hoạt ${selectedUsers.length} người dùng thành công!`);
+        case 'activate': {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ status: 'active' })
+            .in('id', selectedUsers);
+          if (error) throw error;
+          setUsers(prev =>
+            prev.map(user =>
+              selectedUsers.includes(user.id) ? { ...user, status: 'active' } : user
+            )
+          );
+          showSuccess('Kich hoat nguoi dung thanh cong!');
           break;
-        case 'deactivate':
-          setUsers(prev => prev.map(user => 
-            selectedUsers.includes(user.id) ? { ...user, status: 'inactive' } : user
-          ));
-          showSuccess(`Vô hiệu hóa ${selectedUsers.length} người dùng thành công!`);
+        }
+        case 'deactivate': {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ status: 'inactive' })
+            .in('id', selectedUsers);
+          if (error) throw error;
+          setUsers(prev =>
+            prev.map(user =>
+              selectedUsers.includes(user.id) ? { ...user, status: 'inactive' } : user
+            )
+          );
+          showSuccess('Vo hieu hoa nguoi dung thanh cong!');
           break;
-        case 'delete':
-          if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedUsers.length} người dùng?`)) {
+        }
+        case 'delete': {
+          if (window.confirm('Ban co chac chan muon xoa nguoi dung?')) {
+            const { error } = await supabase
+              .from('profiles')
+              .delete()
+              .in('id', selectedUsers);
+            if (error) throw error;
             setUsers(prev => prev.filter(user => !selectedUsers.includes(user.id)));
-            showSuccess(`Xóa ${selectedUsers.length} người dùng thành công!`);
+            showSuccess('Xoa nguoi dung thanh cong!');
           }
           break;
+        }
       }
       setSelectedUsers([]);
     } catch (error) {
-      showError('Lỗi khi thực hiện thao tác');
+      console.error(error);
+      showError('L?i khi th?c hi?n thao t?c');
     }
   };
 

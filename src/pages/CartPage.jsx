@@ -171,7 +171,6 @@ const CartPage = () => {
               className="w-full bg-blue-50 text-white font-bold py-3 rounded-full mt-6 hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
             >
               <span>Tiến hành thanh toán</span>
-              <span className="material-symbols-outlined">arrow_forward</span>
             </button>
           </div>
         </div>

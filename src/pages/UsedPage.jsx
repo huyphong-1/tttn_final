@@ -17,8 +17,7 @@ const toNumberOrNull = (value) => {
 };
 
 const PAGE_SIZE = 12;
-
-export default function TrendingPage() {
+export default function UsedPage() {
   const { addItem } = useCart();
 
   const [q, setQ] = useState("");
@@ -38,7 +37,7 @@ export default function TrendingPage() {
   }, [debouncedKeyword, brand, normalizedMin, normalizedMax, sort]);
 
   const { products, loading, error, totalCount } = useProducts({
-    isTrending: true,
+    condition: "used",
     keyword: debouncedKeyword || undefined,
     brand,
     priceGte: normalizedMin,
@@ -58,15 +57,16 @@ export default function TrendingPage() {
     setMinPrice("");
     setMaxPrice("");
     setSort(SORT_OPTIONS[0].value);
+    setPage(1);
   };
 
-  const handleAdd = (p) => {
+  const handleAdd = (product) => {
     addItem({
-      id: `trending-${p.id}`,
-      productId: p.id,
-      name: p.name,
-      price: Number(p.price) || 0,
-      image: p.image,
+      id: `used-${product.id}`,
+      productId: product.id,
+      name: product.name,
+      price: Number(product.price),
+      image: product.image,
     });
   };
 
@@ -76,14 +76,16 @@ export default function TrendingPage() {
   return (
     <main className="max-w-6xl mx-auto px-4 pt-10 pb-14">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold">Trending Products</h1>
-        <p className="text-sm text-slate-400 mt-1">Sản phẩm hot hiện nay.</p>
+        <h1 className="text-2xl md:text-3xl font-semibold">Máy cũ giá tốt</h1>
+        <p className="text-sm text-slate-400 mt-1">
+          Danh sách máy đã qua sử dụng.
+        </p>
       </div>
 
       <AdvancedFilterBar
         query={q}
         onQueryChange={setQ}
-        searchPlaceholder="VD: iPhone, Tablet, tai nghe..."
+        searchPlaceholder="VD: iPhone cu, Galaxy secondhand..."
         brand={brand}
         onBrandChange={setBrand}
         brandOptions={BRAND_OPTIONS}
@@ -91,53 +93,53 @@ export default function TrendingPage() {
         maxPrice={maxPrice}
         onMinPriceChange={setMinPrice}
         onMaxPriceChange={setMaxPrice}
-        priceHint="VD: 8000000 - 25000000"
+        priceHint="VD: 3000000 - 15000000"
         sort={sort}
         onSortChange={setSort}
         sortOptions={SORT_OPTIONS}
         onReset={resetFilters}
       />
 
-      {loading && <p className="text-sm text-slate-400 mb-4">Đang tải sản phẩm...</p>}
-      {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
+      {loading && (
+        <p className="text-sm text-slate-400 mt-4">Dang tai danh sach may cu...</p>
+      )}
+      {error && <p className="text-sm text-red-400 mt-4">{error}</p>}
       {showEmpty && (
-        <p className="text-sm text-slate-400 mb-4">
-          {isFiltering ? "Hiện tại không có sản phẩm ." : "Hết hàng."}
+        <p className="text-sm text-slate-400 mt-4">
+          {isFiltering
+            ? "Không tìm thấy sản phẩm phù hợp."
+            : "Hết hàng."}
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {products.map((p) => (
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {products.map((product) => (
           <div
-            key={p.id}
-            className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden relative"
+            key={product.id}
+            className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden hover:border-blue-500/70 transition"
           >
-            <div className="absolute top-3 left-3 z-10">
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/90 text-white">
-                {p.badge || "Hot"}
-              </span>
-            </div>
-
-            <Link to={`/product/${p.id}`} className="block h-[380px] bg-slate-900">
+            <Link to={`/product/${product.id}`} className="block aspect-[4/3] bg-slate-900">
               <img
-                src={p.image}
-                alt={p.name}
-                className="w-full h-full object-cover opacity-80 transition duration-300 hover:opacity-100"
-                loading="lazy"
+                src={product.image}
+                alt={product.name}
+                className="w-full h-full object-cover transition duration-300 hover:scale-105"
               />
             </Link>
 
-            <div className="p-4 border-t border-slate-800/80">
-              <Link to={`/product/${p.id}`}>
+            <div className="p-4 space-y-2">
+              <p className="text-xs uppercase text-slate-400">
+                {product.brand || product.category || "Used"}
+              </p>
+              <Link to={`/product/${product.id}`}>
                 <p className="text-sm font-semibold line-clamp-2 hover:text-blue-400 transition">
-                  {p.name}
+                  {product.name}
                 </p>
               </Link>
-              <p className="mt-1 text-sm font-bold text-blue-400">{formatPrice(p.price)}</p>
+              <p className="text-sm font-bold text-blue-400">{formatPrice(product.price)}</p>
 
               <button
-                onClick={() => handleAdd(p)}
-                className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-xs font-semibold transition"
+                onClick={() => handleAdd(product)}
+                className="mt-2 inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-xs font-medium"
               >
                 Thêm vào giỏ hàng
               </button>

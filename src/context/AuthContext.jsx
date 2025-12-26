@@ -1,6 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { ROLES, hasPermission, hasAnyPermission, hasAllPermissions, isAdmin, isUser, isGuest } from "../config/permissions";
+import {
+  ROLES,
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  isAdmin,
+  isUser,
+  isGuest,
+} from "../config/permissions";
 
 const AuthContext = createContext(null);
 
@@ -9,18 +17,20 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId) => {
-    if (!userId) {
+  const fetchProfile = async (authUser) => {
+    if (!authUser?.id) {
       setProfile(null);
       return;
     }
 
+    const userId = authUser.id;
+
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id,email,role,full_name,phone,address,city")
+        .select("*")
         .eq("id", userId)
-        .maybeSingle(); // ✅ không crash nếu chưa có row
+        .maybeSingle();
 
       if (error) {
         console.error("fetchProfile error:", error.message);
@@ -28,7 +38,38 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      setProfile(data ?? null);
+      if (!data) {
+        const defaultProfile = {
+          id: userId,
+          email: authUser.email || "",
+          full_name: authUser.user_metadata?.full_name || "",
+          role: ROLES.USER,
+          status: "active",
+        };
+
+        try {
+          const { data: inserted, error: insertError } = await supabase
+            .from("profiles")
+            .insert([defaultProfile])
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Unable to create profile:", insertError.message);
+            setProfile(defaultProfile);
+            return;
+          }
+
+          setProfile(inserted || defaultProfile);
+          return;
+        } catch (insertCatch) {
+          console.error("fetchProfile insert catch:", insertCatch);
+          setProfile(defaultProfile);
+          return;
+        }
+      }
+
+      setProfile(data);
     } catch (error) {
       console.error("fetchProfile catch error:", error);
       setProfile(null);
@@ -37,11 +78,18 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let mounted = true;
+    let finished = false;
+
+    const finishLoading = () => {
+      if (mounted && !finished) {
+        finished = true;
+        setLoading(false);
+      }
+    };
 
     const init = async () => {
       try {
         setLoading(true);
-        console.log('AuthContext: Initializing...');
 
         const { data, error } = await supabase.auth.getSession();
         if (error) {
@@ -51,65 +99,56 @@ export function AuthProvider({ children }) {
         const newSession = data?.session ?? null;
         if (!mounted) return;
 
-        console.log('AuthContext: Session loaded:', !!newSession?.user);
         setSession(newSession);
 
-        const userId = newSession?.user?.id;
-        if (userId) {
-          console.log('AuthContext: Fetching profile for user:', userId);
-          await fetchProfile(userId);
+        const authUser = newSession?.user;
+        if (authUser) {
+          fetchProfile(authUser);
         } else {
-          console.log('AuthContext: No user, setting profile to null');
           setProfile(null);
         }
 
-        if (mounted) {
-          console.log('AuthContext: Setting loading to false');
-          setLoading(false);
-        }
+        finishLoading();
       } catch (error) {
-        console.error('AuthContext init error:', error);
+        console.error("AuthContext init error:", error);
         if (mounted) {
           setSession(null);
           setProfile(null);
-          setLoading(false);
         }
+        finishLoading();
       }
     };
 
-    // Timeout fallback để đảm bảo loading được reset
     const timeoutId = setTimeout(() => {
-      if (mounted) {
-        console.log('AuthContext: Timeout fallback - forcing loading to false');
-        setLoading(false);
+      if (!finished && mounted) {
+        console.warn("AuthContext: Timeout fallback - forcing loading to false");
+        finishLoading();
       }
-    }, 5000); // 5 giây timeout
+    }, 8000);
 
     init().finally(() => {
       clearTimeout(timeoutId);
+      finishLoading();
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        console.log('Auth state changed:', event, newSession?.user?.email);
-        
-        if (!mounted) return;
-        
-        setSession(newSession ?? null);
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!mounted) return;
 
-        const userId = newSession?.user?.id;
-        if (userId) {
-          await fetchProfile(userId);
-        } else {
-          setProfile(null);
-        }
-        
-        setLoading(false);
+      setSession(newSession ?? null);
+
+      const authUser = newSession?.user;
+      if (authUser) {
+        fetchProfile(authUser);
+      } else {
+        setProfile(null);
       }
-    );
+
+      finishLoading();
+    });
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       sub?.subscription?.unsubscribe();
     };
   }, []);
@@ -125,58 +164,46 @@ export function AuthProvider({ children }) {
       isGuest: isGuest(profile?.role),
       loading,
 
-      // Permission checking functions
       hasPermission: (permission) => hasPermission(profile?.role, permission),
       hasAnyPermission: (permissions) => hasAnyPermission(profile?.role, permissions),
       hasAllPermissions: (permissions) => hasAllPermissions(profile?.role, permissions),
 
-      // Các hàm xác thực
-      signUp: (email, password) =>
-        supabase.auth.signUp({ email, password }),
+      signUp: (email, password) => supabase.auth.signUp({ email, password }),
 
-      signIn: (email, password) =>
-        supabase.auth.signInWithPassword({ email, password }),
+      signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
 
       signOut: async () => {
         try {
-          // Reset state trước khi gọi API
           setLoading(true);
-          setSession(null);
-          setProfile(null);
-          
-          // Gọi API đăng xuất
+
           const { error } = await supabase.auth.signOut();
           if (error) {
-            console.error('Supabase signOut error:', error);
-            // Vẫn tiếp tục reset state local ngay cả khi API lỗi
+            console.error("Supabase signOut error:", error);
           }
-          
-          // Clear tất cả localStorage
+
           try {
-            localStorage.removeItem('shopsy_cart');
-            localStorage.removeItem('techphone_wishlist');
-            localStorage.clear(); // Clear toàn bộ localStorage
+            localStorage.removeItem("shopsy_cart");
+            localStorage.removeItem("techphone_wishlist");
           } catch (e) {
-            console.warn('Error clearing localStorage:', e);
+            console.warn("Error clearing localStorage:", e);
           }
-          
-          setLoading(false);
-        } catch (error) {
-          console.error('Error in signOut:', error);
-          // Vẫn reset state ngay cả khi có lỗi
+
           setSession(null);
           setProfile(null);
+        } catch (error) {
+          console.error("Error in signOut:", error);
+          setSession(null);
+          setProfile(null);
+        } finally {
           setLoading(false);
         }
       },
     }),
-    [session, profile, loading]  // Chỉ re-render khi session, profile hoặc loading thay đổi
+    [session, profile, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);

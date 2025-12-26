@@ -2,6 +2,8 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import { ROLES } from "../config/permissions";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -52,6 +54,26 @@ export default function RegisterPage() {
       // ✅ đăng ký qua AuthContext
       const { data, error } = await signUp(email, form.password);
       if (error) throw error;
+
+      const authUser = data?.user;
+      if (authUser?.id) {
+        try {
+          await supabase
+            .from("profiles")
+            .upsert(
+              {
+                id: authUser.id,
+                email: authUser.email,
+                role: ROLES.USER,
+                status: "active",
+                full_name: authUser.user_metadata?.full_name || "",
+              },
+              { onConflict: "id" }
+            );
+        } catch (profileError) {
+          console.error("Cannot create profile record:", profileError);
+        }
+      }
 
       // ✅ Auto login nếu Supabase trả session luôn
       // (tuỳ project setting: có thể cần confirm email => không có session)

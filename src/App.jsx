@@ -6,15 +6,18 @@ import Layout from "./components/Layout";
 const HomePage = React.lazy(() => import("./pages/HomePage"));
 const PhonesPage = React.lazy(() => import("./pages/PhonesPage"));
 const AccessoriesPage = React.lazy(() => import("./pages/AccessoriesPage"));
-const SalePage = React.lazy(() => import("./pages/SalePage"));
+const TabletPage = React.lazy(() => import("./pages/TabletPage"));
+const UsedPage = React.lazy(() => import("./pages/UsedPage"));
 const TrendingPage = React.lazy(() => import("./pages/TrendingPage"));
 const BestSellingPage = React.lazy(() => import("./pages/BestSellingPage"));
 const TopRatedPage = React.lazy(() => import("./pages/TopRatedPage"));
 const CartPage = React.lazy(() => import("./pages/CartPage"));
 const CheckoutPage = React.lazy(() => import("./pages/CheckoutPage"));
+const PaymentConfirmationPage = React.lazy(() => import("./pages/PaymentConfirmationPage"));
 const LoginPage = React.lazy(() => import("./pages/LoginPage"));
 const RegisterPage = React.lazy(() => import("./pages/RegisterPage"));
 const ProductDetailPage = React.lazy(() => import("./pages/ProductDetailPage"));
+const SearchPage = React.lazy(() => import("./pages/SearchPage"));
 const OrderHistory = React.lazy(() => import('./components/OrderHistory'));
 
 // Import ProtectedRoute và AdminRoute
@@ -28,7 +31,6 @@ const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
 const ProductManagement = React.lazy(() => import("./pages/admin/ProductManagement"));
 const UserManagement = React.lazy(() => import("./pages/admin/UserManagement"));
 const UserProfile = React.lazy(() => import("./pages/user/UserProfile"));
-const WishlistPage = React.lazy(() => import("./pages/WishlistPage"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -46,18 +48,24 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/phones" element={<PhonesPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/accessories" element={<AccessoriesPage />} />
-          <Route path="/sale" element={<SalePage />} />
+          <Route path="/tablets" element={<TabletPage />} />
+          <Route path="/used" element={<UsedPage />} />
           <Route path="/trending" element={<TrendingPage />} />
           <Route path="/best-selling" element={<BestSellingPage />} />
           <Route path="/top-rated" element={<TopRatedPage />} />
           <Route path="/cart" element={<CartPage />} />
           
           {/* Route cho trang Lịch sử Đơn hàng */}
-          <Route path="/order-history" element={<OrderHistory />} />
-          
-          {/* Wishlist Page */}
-          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route
+            path="/order-history"
+            element={
+              <ProtectedRoute>
+                <OrderHistory />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Các trang khác */}
           <Route path="/login" element={<LoginPage />} />
@@ -79,6 +87,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CheckoutPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/checkout/confirmation"
+            element={
+              <ProtectedRoute>
+                <PaymentConfirmationPage />
               </ProtectedRoute>
             }
           />

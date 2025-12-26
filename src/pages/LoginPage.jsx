@@ -14,7 +14,6 @@ export default function LoginPage() {
   // Redirect nếu đã đăng nhập
   useEffect(() => {
     if (user && !authLoading) {
-      console.log("User đã đăng nhập, chuyển hướng về trang chủ");
       setLoading(false); // Reset loading state
       nav("/", { replace: true });
     }
@@ -22,7 +21,6 @@ export default function LoginPage() {
 
   // Debug authLoading state
   useEffect(() => {
-    console.log("AuthLoading state:", authLoading, "User:", !!user);
   }, [authLoading, user]);
 
   // Fallback timeout để tránh bị treo
@@ -54,12 +52,9 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      console.log("Bắt đầu đăng nhập...");
       
       const { error } = await signIn(email, password);
       if (error) throw error;
-      
-      console.log("Đăng nhập API thành công, đợi AuthContext cập nhật...");
       showSuccess("Đăng nhập thành công!");
       
       // Không navigate ngay, để useEffect handle khi user state được cập nhật

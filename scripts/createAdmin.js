@@ -19,7 +19,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function createAdminUser() {
   try {
-    console.log('🚀 Bắt đầu tạo admin user...');
 
     // Thông tin admin user
     const adminEmail = 'admin@techphone.com';
@@ -30,14 +29,13 @@ async function createAdminUser() {
       email_confirm: true, // Tự động confirm email
     };
 
-    console.log(`📧 Tạo auth user: ${adminEmail}`);
 
     // 1. Tạo user trong Supabase Auth
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser(adminData);
 
     if (authError) {
       if (authError.message.includes('already registered')) {
-        console.log('⚠️  User đã tồn tại, đang cập nhật profile...');
+
         
         // Lấy user hiện tại
         const { data: existingUsers } = await supabase.auth.admin.listUsers();
@@ -56,12 +54,6 @@ async function createAdminUser() {
 
     // 2. Tạo profile trong database
     await updateUserProfile(authUser.user.id);
-
-    console.log('🎉 Tạo admin user hoàn tất!');
-    console.log('📋 Thông tin đăng nhập:');
-    console.log(`   Email: ${adminEmail}`);
-    console.log(`   Password: ${adminPassword}`);
-    console.log('⚠️  Hãy đổi password sau khi đăng nhập lần đầu!');
 
   } catch (error) {
     console.error('❌ Lỗi khi tạo admin user:', error.message);

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   FiUser, 
   FiMail, 
@@ -17,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { usersAPI } from '../../services/api';
 import { validateUserProfile } from '../../utils/validation';
+import { getOrdersByUser, supabase } from '../../lib/supabase';
 
 const UserProfile = () => {
   const { user, profile } = useAuth();
@@ -46,6 +48,8 @@ const UserProfile = () => {
     completed_orders: 0,
     total_spent: 0
   });
+  const [userOrders, setUserOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -59,22 +63,60 @@ const UserProfile = () => {
         gender: profile.gender || ''
       });
     }
-    fetchUserStats();
   }, [profile]);
 
-  const fetchUserStats = async () => {
+  const fetchUserStats = useCallback(async () => {
+    if (!user?.id) return;
     try {
-      // Mock data - replace with real API call
+      setOrdersLoading(true);
+      const orders = await getOrdersByUser(user.id);
+      setUserOrders(orders || []);
+      const totalOrders = orders?.length || 0;
+      const pendingOrders = (orders || []).filter((order) =>
+        ['pending', 'processing'].includes(order.status)
+      ).length;
+      const completedOrders = (orders || []).filter((order) =>
+        ['completed', 'delivered'].includes(order.status)
+      ).length;
+      const totalSpent = (orders || []).reduce(
+        (sum, order) => sum + Number(order.total_amount || 0),
+        0
+      );
       setOrderStats({
-        total_orders: 12,
-        pending_orders: 2,
-        completed_orders: 10,
-        total_spent: 45000000
+        total_orders: totalOrders,
+        pending_orders: pendingOrders,
+        completed_orders: completedOrders,
+        total_spent: totalSpent
       });
     } catch (error) {
       console.error('Error fetching user stats:', error);
+    } finally {
+      setOrdersLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchUserStats();
+  }, [fetchUserStats]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`user-orders-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+        () => {
+          fetchUserStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchUserStats]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -144,6 +186,13 @@ const UserProfile = () => {
       currency: 'VND'
     }).format(price);
   };
+
+  const StatusPill = ({ label, value }) => (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-sm font-semibold text-white">{value}</p>
+    </div>
+  );
 
   const tabs = [
     { id: 'profile', label: 'Thông tin cá nhân', icon: FiUser },
@@ -364,13 +413,49 @@ const UserProfile = () => {
         {activeTab === 'orders' && (
           <div className="p-6">
             <h2 className="text-xl font-bold text-white mb-6">Lịch sử đơn hàng</h2>
-            <div className="text-center py-12">
-              <FiShoppingBag className="text-4xl text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-400">Chưa có đơn hàng nào</p>
-              <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                Mua sắm ngay
-              </button>
-            </div>
+            {ordersLoading ? (
+              <div className="text-center py-12 text-slate-400">
+                Đang tải đơn hàng...
+              </div>
+            ) : userOrders.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <FiShoppingBag className="text-4xl text-slate-500 mx-auto mb-4" />
+                <p>Chưa có đơn hàng nào</p>
+                <Link
+                  to="/phones"
+                  className="inline-flex mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                >
+                  Mua sắm ngay
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="border border-slate-700 rounded-2xl bg-slate-900/40 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                  >
+                    <div>
+                      <p className="text-sm text-slate-400">Đơn hàng #{order.order_number || order.id}</p>
+                      <p className="text-white font-semibold">{formatPrice(order.total_amount)}</p>
+                      <p className="text-xs text-slate-500">
+                        {order.created_at ? new Date(order.created_at).toLocaleString('vi-VN') : '--'}
+                      </p>
+                    </div>
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <StatusPill label="Trạng thái" value={order.status || 'pending'} />
+                      <StatusPill label="Thanh toán" value={order.payment_status || 'pending'} />
+                      <StatusPill label="Phương thức" value={order.payment_method || 'cod'} />
+                    </div>
+                    {order.items?.length ? (
+                      <div className="text-xs text-slate-400">
+                        {order.items.length} sản phẩm
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

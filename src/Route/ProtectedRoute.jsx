@@ -7,7 +7,6 @@ export default function ProtectedRoute({ children }) {
   const { user, loading, session } = useAuth();
   const location = useLocation();
 
-  console.log('ProtectedRoute - Loading:', loading, 'User:', !!user, 'Session:', !!session);
 
   // Cải thiện loading UI với timeout
   if (loading) {
@@ -20,10 +19,8 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    console.log('ProtectedRoute - No user, redirecting to login');
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
-
-  console.log('ProtectedRoute - User authenticated, rendering children');
+  
   return children;
 }

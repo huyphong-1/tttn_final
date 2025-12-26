@@ -1,24 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 import config from '../config/environment';
 
-// Lấy URL và Anon Key từ config
+// L?y URL v� Anon Key t? config
 const supabaseUrl = config.SUPABASE_URL;
 const supabaseAnonKey = config.SUPABASE_ANON_KEY;
 
-// Kiểm tra sự tồn tại của các biến môi trường
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Missing Supabase configuration:", { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey });
+  console.error('Missing Supabase configuration:', {
+    supabaseUrl: !!supabaseUrl,
+    supabaseAnonKey: !!supabaseAnonKey,
+  });
 }
 
-// Tạo Supabase client
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Hàm lấy tất cả các đơn hàng từ bảng 'orders'
 export const getOrders = async () => {
   const { data, error } = await supabase
-    .from('orders')  // Chọn bảng 'orders'
-    .select('id, total_amount, shipping_fee, payment_status, status, created_at')  // Chọn các trường cần thiết
-    .order('created_at', { ascending: false });  // Sắp xếp theo thời gian tạo, đơn hàng mới nhất lên đầu
+    .from('orders')
+    .select(
+      'id, user_id, order_number, total_amount, payment_status, status, created_at, customer_name, customer_email, shipping_city, items'
+    )
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching orders:', error);
@@ -27,13 +29,43 @@ export const getOrders = async () => {
   return data;
 };
 
-// Hàm lấy chi tiết trạng thái đơn hàng từ bảng 'order_status'
+export const getOrdersByUser = async (userId) => {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('orders')
+    .select(
+      'id, order_number, total_amount, payment_status, status, created_at, items, shipping_city, payment_method, customer_name'
+    )
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching user orders:', error);
+    return [];
+  }
+  return data;
+};
+
+export const createOrderRecord = async (payload) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .insert([payload])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating order record:', error);
+    throw error;
+  }
+  return data;
+};
+
 export const getOrderStatus = async (orderId) => {
   const { data, error } = await supabase
     .from('order_status')
     .select('status, updated_at')
-    .eq('order_id', orderId)  // Lọc theo order_id
-    .order('updated_at', { ascending: false });  // Sắp xếp theo thời gian cập nhật
+    .eq('order_id', orderId)
+    .order('updated_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching order status:', error);
@@ -42,12 +74,11 @@ export const getOrderStatus = async (orderId) => {
   return data;
 };
 
-// Hàm lấy thông tin theo dõi đơn hàng từ bảng 'order_tracking'
 export const getOrderTracking = async (orderId) => {
   const { data, error } = await supabase
     .from('order_tracking')
     .select('tracking_number, tracking_url, current_status, updated_at')
-    .eq('order_id', orderId);  // Lọc theo order_id
+    .eq('order_id', orderId);
 
   if (error) {
     console.error('Error fetching order tracking:', error);
@@ -56,5 +87,4 @@ export const getOrderTracking = async (orderId) => {
   return data;
 };
 
-// Export Supabase client để có thể sử dụng ở nơi khác trong ứng dụng
 export { supabase };

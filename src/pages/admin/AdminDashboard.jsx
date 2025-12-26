@@ -11,7 +11,7 @@ import {
   FiEye
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
-import { productsAPI, ordersAPI } from '../../services/api';
+import { supabase } from '../../lib/supabase';
 
 const AdminDashboard = () => {
   const { user, isAdmin } = useAuth();
@@ -34,28 +34,175 @@ const AdminDashboard = () => {
     }
   }, [isAdmin]);
 
+  const isPendingStatus = (status) => ['pending', 'processing'].includes(status);
+  const isCompletedStatus = (status) => ['completed', 'delivered'].includes(status);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('admin-dashboard-stream')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'profiles' },
+        () => {
+          setStats((prev) => ({
+            ...prev,
+            totalUsers: prev.totalUsers + 1
+          }));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          const amount = Number(payload.new?.total_amount || 0);
+          const status = payload.new?.status || 'pending';
+
+          setStats((prev) => ({
+            ...prev,
+            totalOrders: prev.totalOrders + 1,
+            totalRevenue: prev.totalRevenue + amount,
+            pendingOrders: isPendingStatus(status) ? prev.pendingOrders + 1 : prev.pendingOrders,
+            completedOrders: isCompletedStatus(status) ? prev.completedOrders + 1 : prev.completedOrders
+          }));
+
+          setRecentOrders((prev) => {
+            const formatted = {
+              id: payload.new?.id,
+              customer:
+                payload.new?.customer_name ||
+                payload.new?.customer_email ||
+                'KhA­ch hAÿng  §cn danh',
+              total: payload.new?.total_amount || 0,
+              status: payload.new?.status || 'pending',
+              date: payload.new?.created_at
+                ? new Date(payload.new.created_at).toLocaleDateString('vi-VN')
+                : '--'
+            };
+            return [formatted, ...prev].slice(0, 5);
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          const oldStatus = payload.old?.status;
+          const newStatus = payload.new?.status;
+          const oldAmount = Number(payload.old?.total_amount || 0);
+          const newAmount = Number(payload.new?.total_amount || 0);
+
+          setStats((prev) => {
+            let pending = prev.pendingOrders;
+            let completed = prev.completedOrders;
+
+            if (isPendingStatus(oldStatus)) pending = Math.max(0, pending - 1);
+            if (isCompletedStatus(oldStatus)) completed = Math.max(0, completed - 1);
+
+            if (isPendingStatus(newStatus)) pending += 1;
+            if (isCompletedStatus(newStatus)) completed += 1;
+
+            return {
+              ...prev,
+              pendingOrders: pending,
+              completedOrders: completed,
+              totalRevenue: prev.totalRevenue + (newAmount - oldAmount)
+            };
+          });
+
+          setRecentOrders((prev) =>
+            prev.map((order) =>
+              order.id === payload.new?.id
+                ? {
+                    ...order,
+                    total: payload.new?.total_amount || order.total,
+                    status: payload.new?.status || order.status,
+                    date: payload.new?.created_at
+                      ? new Date(payload.new.created_at).toLocaleDateString('vi-VN')
+                      : order.date
+                  }
+                : order
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch stats from API
-      // This would be implemented with real API calls
-      setStats({
-        totalUsers: 1250,
-        totalOrders: 3420,
-        totalRevenue: 125000000,
-        totalProducts: 156,
-        pendingOrders: 23,
-        completedOrders: 3397,
-        averageRating: 4.6,
-        totalViews: 45230
-      });
-      
-      // Mock recent orders
-      setRecentOrders([
-        { id: 1, customer: 'Nguyễn Văn A', total: 15000000, status: 'pending', date: '2024-12-25' },
-        { id: 2, customer: 'Trần Thị B', total: 8500000, status: 'completed', date: '2024-12-24' },
-        { id: 3, customer: 'Lê Văn C', total: 22000000, status: 'processing', date: '2024-12-24' },
+      const [
+        { data: productData, error: productError },
+        { data: ordersData, error: ordersError },
+        { data: userData, error: userError }
+      ] = await Promise.all([
+        supabase.from('products').select('id, price, rating, view_count'),
+        supabase
+          .from('orders')
+          .select('id, total_amount, status, created_at, customer_name, customer_email')
+          .order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id')
       ]);
+
+      if (productError) throw productError;
+      if (ordersError) throw ordersError;
+      if (userError) throw userError;
+
+      const totalProducts = productData?.length || 0;
+      const totalUsers = userData?.length || 0;
+      const totalOrders = ordersData?.length || 0;
+
+      const totalRevenue = (ordersData || []).reduce(
+        (sum, order) => sum + Number(order.total_amount || 0),
+        0
+      );
+      const pendingOrders = (ordersData || []).filter(
+        (order) => order.status === 'pending'
+      ).length;
+      const completedOrders = (ordersData || []).filter(
+        (order) => order.status === 'completed'
+      ).length;
+
+      const averageRating =
+        productData && productData.length
+          ? (
+              productData.reduce((sum, product) => sum + Number(product.rating || 0), 0) /
+              productData.length
+            ).toFixed(1)
+          : 0;
+
+      const totalViews = (productData || []).reduce((sum, product) => {
+        return sum + Number(product.view_count ?? 0);
+      }, 0);
+
+      setStats({
+        totalUsers,
+        totalOrders,
+        totalRevenue,
+        totalProducts,
+        pendingOrders,
+        completedOrders,
+        averageRating: Number(averageRating),
+        totalViews
+      });
+
+      const formattedOrders = (ordersData || []).slice(0, 5).map((order) => ({
+        id: order.id,
+        customer: order.customer_name || order.customer_email || 'Khách hàng ẩn danh',
+        total: order.total_amount || 0,
+        status: order.status || 'pending',
+        date: order.created_at
+          ? new Date(order.created_at).toLocaleDateString('vi-VN')
+          : '--'
+      }));
+
+      setRecentOrders(formattedOrders);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
