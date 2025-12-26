@@ -9,6 +9,7 @@ import {
   FiUser,
   FiCreditCard,
   FiFileText,
+  FiShoppingCart,
 } from "react-icons/fi";
 
 const formatPrice = (n) =>
@@ -90,9 +91,10 @@ export default function PaymentConfirmationPage() {
           </button>
           <Link
             to="/"
-            className="flex-1 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-center text-sm font-semibold text-white transition"
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition"
           >
-            Tiếp tục mua sắm
+            <FiShoppingCart className="text-base" />
+            <span>Tiếp tục mua sắm</span>
           </Link>
         </div>
       </div>

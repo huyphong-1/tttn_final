@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { ROLES } from "../config/permissions";
+import { recordUserRegistration } from "../lib/metrics";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -70,6 +71,7 @@ export default function RegisterPage() {
               },
               { onConflict: "id" }
             );
+          await recordUserRegistration();
         } catch (profileError) {
           console.error("Cannot create profile record:", profileError);
         }

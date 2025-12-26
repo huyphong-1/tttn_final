@@ -34,13 +34,13 @@ const HomePage = () => {
         <div className="max-w-6xl mx-auto px-4 py-10 md:py-16 grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           <div>
             <p className="text-xs font-semibold text-blue-400 uppercase tracking-[0.2em] mb-3">
-              DiDongViet
+              Di Động Việt
             </p>
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-4">
-              Len doi <span className="text-blue-400">smartphone flagship</span> voi gia sinh vien.
+              Lên đời <span className="text-blue-400">smartphone flagship</span> giá ưu đãi.
             </h1>
             <p className="text-sm md:text-base text-slate-300 mb-6">
-              Hang chinh hang, bao hanh toan quoc, ho tro tra gop 0%. Freeship cho don tu 1.000.000d tai Ha Noi va TP.HCM.
+              Hàng chính hãng, bảo hành 100%. Freeship tại Hà Nội và TP.HCM.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -61,7 +61,7 @@ const HomePage = () => {
             <div className="flex flex-wrap gap-6 text-xs text-slate-300">
               <div className="space-y-1">
                 <p className="font-semibold text-slate-100">Freeship</p>
-                <p>Đơn từ 1.000.000</p>
+                <p>Freeship tại Hà Nội và TP.HCM</p>
               </div>
               <div className="space-y-1">
                 <p className="font-semibold text-slate-100">Trả góp 0% </p>
@@ -97,7 +97,7 @@ const HomePage = () => {
                   <p className="text-lg font-bold text-blue-400">
                     {formatPrice(heroProduct?.price || 0)}
                   </p>
-                  <p className="text-[10px] text-emerald-400 mt-1">Tra gop 0%</p>
+                  <p className="text-[10px] text-emerald-400 mt-1">Trả góp 0%</p>
                 </div>
               </div>
             </div>
@@ -112,7 +112,7 @@ const HomePage = () => {
             Flagship mới nhất.
           </p>
 
-          {loading && <p className="text-sm text-slate-400 mb-4">Dang tai san pham moi...</p>}
+          {loading && <p className="text-sm text-slate-400 mb-4">Đang tải sản phẩm mới</p>}
           {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
 
           {showEmpty ? (

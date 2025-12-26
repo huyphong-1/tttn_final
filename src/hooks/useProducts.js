@@ -80,6 +80,7 @@ export const useProducts = (options = {}) => {
       try {
         setLoading(true);
         setError(null);
+        console.info("[useProducts] fetch start", options);
 
         let { data, error, count } = await buildQuery(true);
 
@@ -95,6 +96,10 @@ export const useProducts = (options = {}) => {
         if (active) {
           setProducts(data || []);
           setTotalCount(typeof count === "number" ? count : data?.length || 0);
+          console.info("[useProducts] fetch success", {
+            count: typeof count === "number" ? count : data?.length || 0,
+            items: data?.length || 0,
+          });
         }
       } catch (err) {
         if (active) {

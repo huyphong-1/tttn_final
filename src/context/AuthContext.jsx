@@ -76,6 +76,29 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateLastLogin = async (authUser) => {
+    if (!authUser?.id) return;
+    const lastLogin = new Date().toISOString();
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ last_login: lastLogin })
+        .eq("id", authUser.id);
+
+      if (error) {
+        console.warn("updateLastLogin error:", error.message);
+        return;
+      }
+
+      setProfile((prev) =>
+        prev?.id === authUser.id ? { ...prev, last_login: lastLogin } : prev
+      );
+    } catch (error) {
+      console.warn("updateLastLogin catch:", error);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     let finished = false;
@@ -138,7 +161,10 @@ export function AuthProvider({ children }) {
 
       const authUser = newSession?.user;
       if (authUser) {
-        fetchProfile(authUser);
+        await fetchProfile(authUser);
+        if (event === "SIGNED_IN") {
+          await updateLastLogin(authUser);
+        }
       } else {
         setProfile(null);
       }

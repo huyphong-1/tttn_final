@@ -13,6 +13,17 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
+const isSameDay = (value, baseDate = new Date()) => {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return (
+    date.getFullYear() === baseDate.getFullYear() &&
+    date.getMonth() === baseDate.getMonth() &&
+    date.getDate() === baseDate.getDate()
+  );
+};
+
 const AdminDashboard = () => {
   const { user, isAdmin } = useAuth();
   const [stats, setStats] = useState({
@@ -23,7 +34,9 @@ const AdminDashboard = () => {
     pendingOrders: 0,
     completedOrders: 0,
     averageRating: 0,
-    totalViews: 0
+    totalViews: 0,
+    ordersToday: 0,
+    loginsToday: 0
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,10 +58,12 @@ const AdminDashboard = () => {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'profiles' },
-        () => {
+        (payload) => {
+          const hasLoginToday = isSameDay(payload.new?.last_login, new Date());
           setStats((prev) => ({
             ...prev,
-            totalUsers: prev.totalUsers + 1
+            totalUsers: prev.totalUsers + 1,
+            loginsToday: hasLoginToday ? prev.loginsToday + 1 : prev.loginsToday
           }));
         }
       )
@@ -58,13 +73,15 @@ const AdminDashboard = () => {
         (payload) => {
           const amount = Number(payload.new?.total_amount || 0);
           const status = payload.new?.status || 'pending';
+          const placedToday = isSameDay(payload.new?.created_at, new Date());
 
           setStats((prev) => ({
             ...prev,
             totalOrders: prev.totalOrders + 1,
             totalRevenue: prev.totalRevenue + amount,
             pendingOrders: isPendingStatus(status) ? prev.pendingOrders + 1 : prev.pendingOrders,
-            completedOrders: isCompletedStatus(status) ? prev.completedOrders + 1 : prev.completedOrders
+            completedOrders: isCompletedStatus(status) ? prev.completedOrders + 1 : prev.completedOrders,
+            ordersToday: placedToday ? prev.ordersToday + 1 : prev.ordersToday
           }));
 
           setRecentOrders((prev) => {
@@ -127,6 +144,28 @@ const AdminDashboard = () => {
           );
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        (payload) => {
+          const lastLoginChanged = payload.new?.last_login !== payload.old?.last_login;
+          if (!lastLoginChanged) return;
+
+          const now = new Date();
+          const wasToday = isSameDay(payload.old?.last_login, now);
+          const isToday = isSameDay(payload.new?.last_login, now);
+
+          if (wasToday === isToday) return;
+
+          setStats((prev) => {
+            const delta = isToday ? 1 : -1;
+            return {
+              ...prev,
+              loginsToday: Math.max(0, prev.loginsToday + delta)
+            };
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -147,7 +186,7 @@ const AdminDashboard = () => {
           .from('orders')
           .select('id, total_amount, status, created_at, customer_name, customer_email')
           .order('created_at', { ascending: false }),
-        supabase.from('profiles').select('id')
+        supabase.from('profiles').select('id, last_login')
       ]);
 
       if (productError) throw productError;
@@ -162,11 +201,11 @@ const AdminDashboard = () => {
         (sum, order) => sum + Number(order.total_amount || 0),
         0
       );
-      const pendingOrders = (ordersData || []).filter(
-        (order) => order.status === 'pending'
+      const pendingOrders = (ordersData || []).filter((order) =>
+        isPendingStatus(order.status)
       ).length;
-      const completedOrders = (ordersData || []).filter(
-        (order) => order.status === 'completed'
+      const completedOrders = (ordersData || []).filter((order) =>
+        isCompletedStatus(order.status)
       ).length;
 
       const averageRating =
@@ -181,6 +220,14 @@ const AdminDashboard = () => {
         return sum + Number(product.view_count ?? 0);
       }, 0);
 
+      const now = new Date();
+      const ordersToday = (ordersData || []).filter((order) =>
+        isSameDay(order.created_at, now)
+      ).length;
+      const loginsToday = (userData || []).filter((profile) =>
+        isSameDay(profile.last_login, now)
+      ).length;
+
       setStats({
         totalUsers,
         totalOrders,
@@ -189,7 +236,9 @@ const AdminDashboard = () => {
         pendingOrders,
         completedOrders,
         averageRating: Number(averageRating),
-        totalViews
+        totalViews,
+        ordersToday,
+        loginsToday
       });
 
       const formattedOrders = (ordersData || []).slice(0, 5).map((order) => ({
@@ -268,10 +317,30 @@ const AdminDashboard = () => {
         <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-slate-400 text-sm">Dang nhap hom nay</p>
+              <p className="text-2xl font-bold text-white">{stats.loginsToday.toLocaleString()}</p>
+            </div>
+            <FiEye className="text-cyan-500 text-2xl" />
+          </div>
+        </div>
+
+        <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-slate-400 text-sm">Tổng đơn hàng</p>
               <p className="text-2xl font-bold text-white">{stats.totalOrders.toLocaleString()}</p>
             </div>
             <FiShoppingBag className="text-green-500 text-2xl" />
+          </div>
+        </div>
+
+        <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Don hang hom nay</p>
+              <p className="text-2xl font-bold text-white">{stats.ordersToday.toLocaleString()}</p>
+            </div>
+            <FiShoppingCart className="text-emerald-500 text-2xl" />
           </div>
         </div>
 

@@ -4,7 +4,8 @@ import { FiCreditCard, FiTruck, FiMapPin, FiUser, FiMail, FiPhone } from 'react-
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { supabase } from '../lib/supabase';
+import { supabase, createOrderRecord } from '../lib/supabase';
+import { recordOrderSuccess } from '../lib/metrics';
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -20,8 +21,6 @@ export default function CheckoutPage() {
   const [verifying, setVerifying] = useState(false);
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState('');
-  const [verificationStatus, setVerificationStatus] = useState(null);
-  const [verificationError, setVerificationError] = useState(null);
   const [formData, setFormData] = useState({
     fullName: profile?.full_name || '',
     email: user?.email || '',
@@ -150,6 +149,7 @@ export default function CheckoutPage() {
 
       setPaymentVerified(true);
       setVerificationMessage('Thanh toan da duoc xac thuc thanh cong.');
+      await recordOrderSuccess(cartTotal);
 
       try {
         localStorage.setItem("lastOrder", JSON.stringify(orderDetails));
