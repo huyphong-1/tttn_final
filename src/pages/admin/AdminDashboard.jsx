@@ -294,7 +294,7 @@ const AdminDashboard = () => {
               customer:
                 payload.new?.customer_name ||
                 payload.new?.customer_email ||
-                'Khach hang an danh',
+                'Khách hàng ẩn danh',
               total: payload.new?.total_amount || 0,
               status: payload.new?.status || 'pending',
               date: payload.new?.created_at
@@ -559,7 +559,7 @@ const AdminDashboard = () => {
       {/* Recent Orders */}
       <div className="bg-slate-800 rounded-lg border border-slate-700">
         <div className="p-6 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">Don hang gan day</h2>
+          <h2 className="text-xl font-bold text-white">Đơn hàng gần đây</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -569,16 +569,16 @@ const AdminDashboard = () => {
                   ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Khach hang
+                  Khách hàng
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Tong tien
+                  Tổng cộng
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Trang thai
+                  Trạng thái
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Ngay
+                  Ngày đặt hàng
                 </th>
               </tr>
             </thead>
@@ -586,7 +586,7 @@ const AdminDashboard = () => {
               {pagedOrders.length === 0 ? (
                 <tr>
                   <td className="px-6 py-6 text-sm text-slate-400 text-center" colSpan="5">
-                    Khong co don hang
+                    Không có đơn hàng
                   </td>
                 </tr>
               ) : (
@@ -618,8 +618,8 @@ const AdminDashboard = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-4 border-t border-slate-700">
           <p className="text-sm text-slate-400">
             {hasOrders
-              ? `Hien thi ${rangeStart}-${rangeEnd} / ${recentOrdersCount} don hang`
-              : 'Khong co don hang'}
+              ? `Hiển thị ${rangeStart}-${rangeEnd} / ${recentOrdersCount} đơn hàng`
+              : 'Không có đơn hàng nào.'}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -628,7 +628,7 @@ const AdminDashboard = () => {
               disabled={currentPage === 1 || !hasOrders}
               className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
             >
-              Truoc
+              Trước
             </button>
             <span className="text-sm text-slate-300">
               Trang {currentPage} / {totalPages}

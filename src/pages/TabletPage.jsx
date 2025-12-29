@@ -80,9 +80,9 @@ export default function TabletPage() {
   return (
     <main className="max-w-6xl mx-auto px-4 pt-10 pb-14">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold">May tinh bang</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold">Máy tính bảng</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Chon tablet de hoc, ve, xem phim.
+          Chọn tablet chính hãng, giá tốt nhất tại Di Động Việt.
         </p>
       </div>
 

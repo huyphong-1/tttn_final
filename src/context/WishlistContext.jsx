@@ -22,12 +22,10 @@ export const WishlistProvider = ({ children }) => {
   const { showSuccess, showInfo } = useToast();
   const [items, setItems] = useState(readWishlistFromStorage);
 
-  // Lưu vào localStorage mỗi khi wishlist thay đổi
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
-      // ignore storage errors
     }
   }, [items]);
 

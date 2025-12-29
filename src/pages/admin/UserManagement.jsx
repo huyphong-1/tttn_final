@@ -589,7 +589,7 @@ const UserManagement = () => {
                           <button
                             onClick={() => handleEditUser(user)}
                             className="text-blue-400 hover:text-blue-300 p-1"
-                            title="Chinh sua"
+                            title="Chỉnh sửa"
                           >
                             <FiEdit2 />
                           </button>
@@ -614,8 +614,8 @@ const UserManagement = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-4 border-t border-slate-700">
             <p className="text-sm text-slate-400">
               {totalCount > 0
-                ? `Hien thi ${rangeStart}-${rangeEnd} / ${totalCount} nguoi dung`
-                : 'Khong co nguoi dung'}
+                ? `Hiển thị ${rangeStart}-${rangeEnd} / ${totalCount} người dùng`
+                : 'Không có người dùng để hiển thị'}
             </p>
             <div className="flex items-center gap-3">
               <select
@@ -660,7 +660,7 @@ const UserManagement = () => {
             <div className="bg-slate-800 rounded-lg max-w-lg w-full">
               <div className="p-6 border-b border-slate-700 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white">
-                  {editingUser ? 'Chinh sua nguoi dung' : 'Them nguoi dung moi'}
+                  {editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
                 </h2>
                 <button onClick={resetForm} className="text-slate-400 hover:text-white">
                   <FiX />
@@ -688,7 +688,7 @@ const UserManagement = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Ho va ten
+                    Họ và tên
                   </label>
                   <input
                     type="text"
@@ -703,7 +703,7 @@ const UserManagement = () => {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Mat khau *
+                        Mật khẩu *
                       </label>
                       <input
                         type="password"
@@ -717,7 +717,7 @@ const UserManagement = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Xac nhan mat khau *
+                        Xác nhận mật khẩu *
                       </label>
                       <input
                         type="password"
@@ -734,7 +734,7 @@ const UserManagement = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Quyen
+                      QUYỀN
                     </label>
                     <select
                       name="role"
@@ -757,8 +757,8 @@ const UserManagement = () => {
                       onChange={handleFormChange}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="active">Hoat dong</option>
-                      <option value="inactive">Vo hieu hoa</option>
+                      <option value="active">Hoạt động</option>
+                      <option value="inactive">Vô hiệu hoá</option>
                     </select>
                   </div>
                 </div>
@@ -777,7 +777,7 @@ const UserManagement = () => {
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white flex items-center gap-2 disabled:opacity-60"
                   >
                     <FiSave />
-                    {saving ? 'Dang luu...' : 'Luu'}
+                    {saving ? 'Đang lưu...' : 'Lưu'}
                   </button>
                 </div>
               </form>
