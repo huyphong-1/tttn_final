@@ -1,31 +1,30 @@
+// src/pages/account/UserProfile.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  FiUser, 
-  FiMail, 
-  FiPhone, 
-  FiMapPin, 
-  FiEdit2, 
+import {
+  FiUser,
+  FiEdit2,
   FiSave,
   FiX,
   FiShoppingBag,
   FiHeart,
-  FiSettings,
   FiLock,
   FiCamera
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { usersAPI } from '../../services/api';
+import { usersAPI } from '../../services/api'; // đảm bảo export usersAPI.updateUserProfile / getMyProfile
 import { validateUserProfile } from '../../utils/validation';
 import { getOrdersByUser, supabase } from '../../lib/supabase';
 
 const UserProfile = () => {
   const { user, profile } = useAuth();
   const { showSuccess, showError } = useToast();
+
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const [profileData, setProfileData] = useState({
     full_name: '',
     phone: '',
@@ -51,6 +50,10 @@ const UserProfile = () => {
   const [userOrders, setUserOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
 
+  // ✅ Đúng ngữ cảnh: UserProfile chỉ dành cho người đã đăng nhập.
+  // Nếu chưa login, hiển thị CTA đi login/register thay vì nhét signUp vào đây.
+  const isAuthed = Boolean(user?.id);
+
   useEffect(() => {
     if (profile) {
       setProfileData({
@@ -67,10 +70,13 @@ const UserProfile = () => {
 
   const fetchUserStats = useCallback(async () => {
     if (!user?.id) return;
+
     try {
       setOrdersLoading(true);
       const orders = await getOrdersByUser(user.id);
+
       setUserOrders(orders || []);
+
       const totalOrders = orders?.length || 0;
       const pendingOrders = (orders || []).filter((order) =>
         ['pending', 'processing'].includes(order.status)
@@ -82,6 +88,7 @@ const UserProfile = () => {
         (sum, order) => sum + Number(order.total_amount || 0),
         0
       );
+
       setOrderStats({
         total_orders: totalOrders,
         pending_orders: pendingOrders,
@@ -96,9 +103,11 @@ const UserProfile = () => {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!isAuthed) return;
     fetchUserStats();
-  }, [fetchUserStats]);
+  }, [fetchUserStats, isAuthed]);
 
+  // ✅ Realtime orders của user
   useEffect(() => {
     if (!user?.id) return;
 
@@ -118,9 +127,41 @@ const UserProfile = () => {
     };
   }, [user?.id, fetchUserStats]);
 
+  // ✅ (Optional) Realtime profile của user để UI tự refresh khi DB đổi
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const ch = supabase
+      .channel(`profile-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          if (payload?.new) {
+            const p = payload.new;
+            setProfileData((prev) => ({
+              ...prev,
+              full_name: p.full_name ?? prev.full_name,
+              phone: p.phone ?? prev.phone,
+              address: p.address ?? prev.address,
+              city: p.city ?? prev.city,
+              avatar_url: p.avatar_url ?? prev.avatar_url,
+              date_of_birth: p.date_of_birth ?? prev.date_of_birth,
+              gender: p.gender ?? prev.gender
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [user?.id]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setProfileData(prev => ({
+    setProfileData((prev) => ({
       ...prev,
       [name]: value
     }));
@@ -128,7 +169,7 @@ const UserProfile = () => {
 
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
-    setPasswordData(prev => ({
+    setPasswordData((prev) => ({
       ...prev,
       [name]: value
     }));
@@ -136,17 +177,23 @@ const UserProfile = () => {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+
+    if (!user?.id) {
+      showError('Bạn cần đăng nhập để cập nhật thông tin.');
+      return;
+    }
+
     try {
       setLoading(true);
       validateUserProfile(profileData);
 
-      // API call to update profile
-      // await usersAPI.updateUserProfile(user.id, profileData);
-      
+      // ✅ DB nhận dữ liệu: update vào public.profiles
+      await usersAPI.updateUserProfile(user.id, profileData);
+
       showSuccess('Cập nhật thông tin thành công!');
       setIsEditing(false);
     } catch (error) {
-      showError(error.message || 'Có lỗi xảy ra khi cập nhật thông tin');
+      showError(error?.message || 'Có lỗi xảy ra khi cập nhật thông tin');
     } finally {
       setLoading(false);
     }
@@ -154,6 +201,12 @@ const UserProfile = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+
+    if (!user?.email) {
+      showError('Không tìm thấy email người dùng.');
+      return;
+    }
+
     try {
       if (passwordData.new_password !== passwordData.confirm_password) {
         showError('Mật khẩu xác nhận không khớp');
@@ -166,7 +219,25 @@ const UserProfile = () => {
       }
 
       setLoading(true);
-      // API call to change password
+
+      // ✅ Supabase không “đổi pass bằng current_password” trực tiếp.
+      // Cách phổ biến: re-auth bằng signInWithPassword rồi updateUser(password)
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: passwordData.current_password
+      });
+
+      if (reauthError) {
+        showError('Mật khẩu hiện tại không đúng');
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordData.new_password
+      });
+
+      if (updateError) throw updateError;
+
       showSuccess('Đổi mật khẩu thành công!');
       setPasswordData({
         current_password: '',
@@ -174,7 +245,7 @@ const UserProfile = () => {
         confirm_password: ''
       });
     } catch (error) {
-      showError(error.message || 'Có lỗi xảy ra khi đổi mật khẩu');
+      showError(error?.message || 'Có lỗi xảy ra khi đổi mật khẩu');
     } finally {
       setLoading(false);
     }
@@ -201,6 +272,42 @@ const UserProfile = () => {
     { id: 'security', label: 'Bảo mật', icon: FiLock }
   ];
 
+  // ✅ Nếu chưa đăng nhập, hiển thị UI hợp ngữ cảnh
+  if (!isAuthed) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-8 text-center">
+          <div className="w-20 h-20 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-5">
+            <FiUser className="text-3xl text-slate-300" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Tài khoản của bạn</h1>
+          <p className="text-slate-300 mb-6">
+            Bạn cần đăng nhập để xem hồ sơ, đơn hàng và bảo mật.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/login"
+              className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition"
+            >
+              Đăng nhập
+            </Link>
+            <Link
+              to="/register"
+              className="px-5 py-2 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-700 transition"
+            >
+              Tạo tài khoản
+            </Link>
+          </div>
+
+          <p className="text-xs text-slate-500 mt-5">
+            Tip: Đăng ký xong, DB sẽ tự tạo hồ sơ nếu bạn có trigger “handle_new_user”.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
@@ -209,26 +316,31 @@ const UserProfile = () => {
           <div className="relative">
             <div className="w-24 h-24 bg-slate-700 rounded-full flex items-center justify-center overflow-hidden">
               {profileData.avatar_url ? (
-                <img 
-                  src={profileData.avatar_url} 
-                  alt="Avatar" 
+                <img
+                  src={profileData.avatar_url}
+                  alt="Avatar"
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <FiUser className="text-3xl text-slate-400" />
               )}
             </div>
-            <button className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 rounded-full p-2 transition-colors">
-              <FiCamera className="text-sm" />
+            <button
+              type="button"
+              className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 rounded-full p-2 transition-colors"
+              onClick={() => showError('Chức năng đổi avatar chưa nối API upload.')}
+              title="Đổi avatar"
+            >
+              <FiCamera className="text-sm text-white" />
             </button>
           </div>
-          
+
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-white mb-2">
               {profileData.full_name || user?.email || 'Người dùng'}
             </h1>
             <p className="text-slate-300 mb-4">{user?.email}</p>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-400">{orderStats.total_orders}</div>
@@ -243,7 +355,9 @@ const UserProfile = () => {
                 <div className="text-xs text-slate-400">Hoàn thành</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-400">{formatPrice(orderStats.total_spent)}</div>
+                <div className="text-2xl font-bold text-purple-400">
+                  {formatPrice(orderStats.total_spent)}
+                </div>
                 <div className="text-xs text-slate-400">Tổng chi tiêu</div>
               </div>
             </div>
@@ -262,6 +376,7 @@ const UserProfile = () => {
                 ? 'bg-blue-600 text-white'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
+            type="button"
           >
             <tab.icon className="text-sm" />
             {tab.label}
@@ -276,8 +391,9 @@ const UserProfile = () => {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-white">Thông tin cá nhân</h2>
               <button
-                onClick={() => setIsEditing(!isEditing)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                type="button"
+                onClick={() => setIsEditing((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-white"
               >
                 {isEditing ? <FiX /> : <FiEdit2 />}
                 {isEditing ? 'Hủy' : 'Chỉnh sửa'}
@@ -287,9 +403,7 @@ const UserProfile = () => {
             <form onSubmit={handleSaveProfile}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Họ và tên
-                  </label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Họ và tên</label>
                   <input
                     type="text"
                     name="full_name"
@@ -301,9 +415,7 @@ const UserProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Email
-                  </label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
                   <input
                     type="email"
                     value={user?.email || ''}
@@ -327,9 +439,7 @@ const UserProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Ngày sinh
-                  </label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Ngày sinh</label>
                   <input
                     type="date"
                     name="date_of_birth"
@@ -341,9 +451,7 @@ const UserProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Giới tính
-                  </label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Giới tính</label>
                   <select
                     name="gender"
                     value={profileData.gender}
@@ -359,9 +467,7 @@ const UserProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Thành phố
-                  </label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Thành phố</label>
                   <input
                     type="text"
                     name="city"
@@ -373,9 +479,7 @@ const UserProfile = () => {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Địa chỉ
-                  </label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Địa chỉ</label>
                   <textarea
                     name="address"
                     value={profileData.address}
@@ -414,16 +518,14 @@ const UserProfile = () => {
           <div className="p-6">
             <h2 className="text-xl font-bold text-white mb-6">Lịch sử đơn hàng</h2>
             {ordersLoading ? (
-              <div className="text-center py-12 text-slate-400">
-                Đang tải đơn hàng...
-              </div>
+              <div className="text-center py-12 text-slate-400">Đang tải đơn hàng...</div>
             ) : userOrders.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <FiShoppingBag className="text-4xl text-slate-500 mx-auto mb-4" />
                 <p>Chưa có đơn hàng nào</p>
                 <Link
                   to="/phones"
-                  className="inline-flex mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                  className="inline-flex mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition text-white"
                 >
                   Mua sắm ngay
                 </Link>
@@ -436,10 +538,14 @@ const UserProfile = () => {
                     className="border border-slate-700 rounded-2xl bg-slate-900/40 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
                   >
                     <div>
-                      <p className="text-sm text-slate-400">Đơn hàng #{order.order_number || order.id}</p>
+                      <p className="text-sm text-slate-400">
+                        Đơn hàng #{order.order_number || order.id}
+                      </p>
                       <p className="text-white font-semibold">{formatPrice(order.total_amount)}</p>
                       <p className="text-xs text-slate-500">
-                        {order.created_at ? new Date(order.created_at).toLocaleString('vi-VN') : '--'}
+                        {order.created_at
+                          ? new Date(order.created_at).toLocaleString('vi-VN')
+                          : '--'}
                       </p>
                     </div>
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -448,9 +554,7 @@ const UserProfile = () => {
                       <StatusPill label="Phương thức" value={order.payment_method || 'cod'} />
                     </div>
                     {order.items?.length ? (
-                      <div className="text-xs text-slate-400">
-                        {order.items.length} sản phẩm
-                      </div>
+                      <div className="text-xs text-slate-400">{order.items.length} sản phẩm</div>
                     ) : null}
                   </div>
                 ))}
@@ -472,7 +576,7 @@ const UserProfile = () => {
         {activeTab === 'security' && (
           <div className="p-6">
             <h2 className="text-xl font-bold text-white mb-6">Đổi mật khẩu</h2>
-            
+
             <form onSubmit={handleChangePassword} className="max-w-md">
               <div className="space-y-4">
                 <div>
@@ -524,6 +628,10 @@ const UserProfile = () => {
                 >
                   {loading ? 'Đang cập nhật...' : 'Đổi mật khẩu'}
                 </button>
+
+                <p className="text-xs text-slate-500">
+                  Lưu ý: đổi mật khẩu sẽ re-auth bằng mật khẩu hiện tại trước khi cập nhật.
+                </p>
               </div>
             </form>
           </div>

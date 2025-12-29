@@ -1,31 +1,14 @@
-const toTitleCase = (value = "") =>
-  value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+const normalizeCategory = (value) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
 
 const buildVariants = (raw) => {
-  if (typeof raw !== "string") return [];
-  const trimmed = raw.trim();
-  if (!trimmed) return [];
+  const lower = normalizeCategory(raw);
+  if (!lower) return [];
 
-  const lower = trimmed.toLowerCase();
   const singularLower = lower.endsWith("s") ? lower.slice(0, -1) : lower;
   const pluralLower = lower.endsWith("s") ? lower : `${lower}s`;
 
-  const variants = new Set([
-    trimmed,
-    lower,
-    trimmed.toLowerCase(),
-    trimmed.toUpperCase(),
-    toTitleCase(lower),
-    lower.toUpperCase(),
-    singularLower,
-    toTitleCase(singularLower),
-    singularLower.toUpperCase(),
-    pluralLower,
-    toTitleCase(pluralLower),
-    pluralLower.toUpperCase(),
-  ]);
-
-  return Array.from(variants).filter(Boolean);
+  return Array.from(new Set([lower, singularLower, pluralLower])).filter(Boolean);
 };
 
 export const expandCategoryValues = (values = []) => {

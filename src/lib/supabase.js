@@ -74,19 +74,49 @@ console.info("[supabase] client", {
   usesCustomFetch: supabase?.rest?.fetch === timeoutFetch,
 });
 
-const SESSION_TIMEOUT_MS = 8000;
+let cachedSession = null;
+
+const cacheSession = (session) => {
+  cachedSession = session ?? null;
+};
+
+const resolveStorageKey = () => {
+  if (supabase?.storageKey) return supabase.storageKey;
+  if (!supabaseUrl) return "";
+  try {
+    return `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
+  } catch {
+    return "";
+  }
+};
+
+const loadSessionFromStorage = () => {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  const storageKey = resolveStorageKey();
+  if (!storageKey) return;
+  const raw = window.localStorage.getItem(storageKey);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.access_token) cacheSession(parsed);
+  } catch (error) {
+    console.warn("[supabase] storage parse error", error);
+  }
+};
+
+loadSessionFromStorage();
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  cacheSession(session);
+});
+const SESSION_TIMEOUT_MS = 15000;
 const originalGetSession = supabase.auth.getSession.bind(supabase.auth);
-let skipAuthSession = false;
 
 supabase.auth.getSession = async (...args) => {
-  if (skipAuthSession) {
-    console.warn("[supabase] getSession skipped");
-    return { data: { session: null }, error: null };
-  }
-
   console.info("[supabase] getSession start");
+  let timeoutId;
   const timeoutResult = new Promise((resolve) => {
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       resolve({
         data: { session: null },
         error: new Error("getSession timeout"),
@@ -94,17 +124,30 @@ supabase.auth.getSession = async (...args) => {
     }, SESSION_TIMEOUT_MS);
   });
 
-  const result = await Promise.race([originalGetSession(...args), timeoutResult]);
+  const result = await Promise.race([originalGetSession(...args), timeoutResult]).finally(
+    () => clearTimeout(timeoutId)
+  );
 
   if (result?.error) {
+    const isTimeout = result.error.message === "getSession timeout";
+    if (isTimeout) {
+      if (import.meta?.env?.DEV && !cachedSession) {
+        console.info("[supabase] getSession timeout");
+      }
+      return { data: { session: cachedSession }, error: null };
+    }
     console.warn("[supabase] getSession end", result.error);
-    skipAuthSession = true;
-  } else {
-    console.info("[supabase] getSession end");
+    return result;
   }
 
+  if (result?.data?.session) {
+    cacheSession(result.data.session);
+  }
+
+  console.info("[supabase] getSession end");
   return result;
 };
+
 
 export const getOrders = async () => {
   const { data, error } = await supabase
@@ -178,5 +221,7 @@ export const getOrderTracking = async (orderId) => {
   }
   return data;
 };
+
+export const getCachedSession = () => cachedSession;
 
 export { supabase };

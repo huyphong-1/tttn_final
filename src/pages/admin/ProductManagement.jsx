@@ -11,8 +11,13 @@ import {
   FiX
 } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { supabase } from '../../lib/supabase';
 import { validateProduct } from '../../utils/validation';
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const DEFAULT_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const ProductManagement = () => {
   const { showSuccess, showError } = useToast();
@@ -20,6 +25,9 @@ const ProductManagement = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
@@ -45,20 +53,36 @@ const ProductManagement = () => {
     'headphones'
   ];
 
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), SEARCH_DEBOUNCE_MS);
+
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [currentPage, pageSize, filterCategory, debouncedSearch]);
 
-  const fetchProducts = async () => {
+    const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      if (filterCategory !== 'all') {
+        query = query.eq('category', filterCategory);
+      }
+
+      if (debouncedSearch) {
+        query = query.or(`name.ilike.%${debouncedSearch}%,brand.ilike.%${debouncedSearch}%`);
+      }
+
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error, count } = await query.range(from, to);
 
       if (error) throw error;
       setProducts(data || []);
+      setTotalCount(typeof count === 'number' ? count : 0);
     } catch (error) {
       console.error(error);
       showError('Lỗi khi tải danh sách sản phẩm');
@@ -89,7 +113,7 @@ const ProductManagement = () => {
           featured: Boolean(formData.featured),
           status: formData.status || 'active'
         };
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('products')
           .update(payload)
           .eq('id', editingProduct.id)
@@ -97,7 +121,7 @@ const ProductManagement = () => {
           .single();
 
         if (error) throw error;
-        setProducts(prev => prev.map(p => (p.id === editingProduct.id ? data : p)));
+        await fetchProducts();
         showSuccess('C?p nh?t s?n ph?m th?nh c?ng!');
       } else {
         const payload = {
@@ -108,14 +132,14 @@ const ProductManagement = () => {
           featured: Boolean(formData.featured),
           status: formData.status || 'active'
         };
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('products')
           .insert([payload])
           .select()
           .single();
 
         if (error) throw error;
-        setProducts(prev => [data, ...prev]);
+        await fetchProducts();
         showSuccess('Th?m s?n ph?m th?nh c?ng!');
       }
 
@@ -176,12 +200,7 @@ const ProductManagement = () => {
     setShowModal(false);
   };
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.brand.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = products;
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -189,6 +208,10 @@ const ProductManagement = () => {
       currency: 'VND'
     }).format(price);
   };
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount);
 
   if (loading) {
     return (
@@ -225,7 +248,10 @@ const ProductManagement = () => {
               type="text"
               placeholder="Tìm kiếm sản phẩm..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -234,7 +260,10 @@ const ProductManagement = () => {
             <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <select
               value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
+              onChange={(e) => {
+                setFilterCategory(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Tất cả danh mục</option>
@@ -246,9 +275,9 @@ const ProductManagement = () => {
             </select>
           </div>
 
-          <div className="text-slate-300 flex items-center">
-            Tổng: {filteredProducts.length} sản phẩm
-          </div>
+            <div className="text-slate-300 flex items-center">
+              Tong: {totalCount} san pham
+            </div>
         </div>
       </div>
 
@@ -283,7 +312,7 @@ const ProductManagement = () => {
                 <tr key={product.id} className="hover:bg-slate-700/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <img 
+                      <img loading="lazy" 
                         src={product.image} 
                         alt={product.name}
                         className="w-12 h-12 rounded-lg object-cover mr-4"
@@ -345,6 +374,48 @@ const ProductManagement = () => {
             </tbody>
           </table>
         </div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-4 border-t border-slate-700">
+            <p className="text-sm text-slate-400">
+              {totalCount > 0
+                ? `Hien thi ${rangeStart}-${rangeEnd} / ${totalCount} san pham`
+                : 'Khong co san pham'}
+            </p>
+            <div className="flex items-center gap-3">
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-sm text-slate-200"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}/page
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || totalCount === 0}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
+              >
+                Truoc
+              </button>
+              <span className="text-sm text-slate-300">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || totalCount === 0}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
       </div>
 
       {/* Modal */}

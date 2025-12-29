@@ -6,6 +6,7 @@ import AdvancedFilterBar from "../components/filters/AdvancedFilterBar";
 import Pagination from "../components/Pagination";
 import { BRAND_OPTIONS, SORT_OPTIONS, getSortConfig } from "../constants/filterOptions";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { PRODUCT_LIST_FIELDS } from "../constants/productFields";
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -17,6 +18,7 @@ const toNumberOrNull = (value) => {
 };
 
 const PAGE_SIZE = 12;
+const CACHE_TTL_MS = 60000;
 
 export default function PhonesPage() {
   const { addItem } = useCart();
@@ -48,6 +50,8 @@ export default function PhonesPage() {
     isActive: true,
     pageSize: PAGE_SIZE,
     page,
+    fields: PRODUCT_LIST_FIELDS,
+    cacheTtlMs: CACHE_TTL_MS,
   });
 
   const isFiltering =

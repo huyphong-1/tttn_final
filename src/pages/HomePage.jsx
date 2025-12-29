@@ -3,9 +3,11 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useProducts } from "../hooks/useProducts";
+import { PRODUCT_LIST_FIELDS } from "../constants/productFields";
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+const CACHE_TTL_MS = 60000;
 
 const HomePage = () => {
   const { addItem } = useCart();
@@ -13,6 +15,9 @@ const HomePage = () => {
     inCategory: ["phone", "phones"],
     orderBy: "created_at",
     pageSize: 6,
+    fields: PRODUCT_LIST_FIELDS,
+    count: null,
+    cacheTtlMs: CACHE_TTL_MS,
   });
 
   const heroProduct = products[0];
@@ -133,6 +138,7 @@ const HomePage = () => {
                     <img
                       src={p.image}
                       alt={p.name}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
                   </Link>

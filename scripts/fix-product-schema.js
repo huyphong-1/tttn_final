@@ -18,10 +18,12 @@ const statements = [
   `ALTER TABLE public.products ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false`,
   `ALTER TABLE public.products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`,
   `ALTER TABLE public.products ADD COLUMN IF NOT EXISTS condition TEXT DEFAULT 'new'`,
+  `ALTER TABLE public.products ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0`,
   `ALTER TABLE public.products ALTER COLUMN status SET DEFAULT 'active'`,
   `ALTER TABLE public.products ALTER COLUMN condition SET DEFAULT 'new'`,
   `UPDATE public.products SET status = 'active' WHERE status IS NULL`,
   `UPDATE public.products SET condition = 'new' WHERE condition IS NULL`,
+  `UPDATE public.products SET view_count = 0 WHERE view_count IS NULL`,
   `DO $$ BEGIN
      IF NOT EXISTS (
        SELECT 1 FROM pg_constraint WHERE conname = 'products_status_check'

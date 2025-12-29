@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, getCachedSession } from "../lib/supabase";
 import {
   ROLES,
   hasPermission,
@@ -12,6 +12,7 @@ import {
 import { isAdminEmail } from "../config/adminConfig";
 
 const AuthContext = createContext(null);
+let hasWarnedSessionSlow = false;
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
@@ -72,9 +73,10 @@ export function AuthProvider({ children }) {
           return;
         }
       } else {
-        // Kiểm tra xem profile có role admin chưa nếu là admin email
-        if (isAdminEmail(authUser.email) && data.role !== ROLES.ADMIN) {
-          
+        const isAdminAccount = isAdminEmail(authUser.email);
+
+        // Keep admin role in sync with configured admin emails
+        if (isAdminAccount && data.role !== ROLES.ADMIN) {
           try {
             const { data: updated, error: updateError } = await supabase
               .from("profiles")
@@ -82,7 +84,26 @@ export function AuthProvider({ children }) {
               .eq("id", userId)
               .select()
               .single();
-              
+
+            if (updateError) {
+              console.error("Unable to update profile role:", updateError.message);
+              setProfile(data);
+            } else {
+              setProfile(updated);
+            }
+          } catch (updateErr) {
+            console.error("Error updating profile:", updateErr);
+            setProfile(data);
+          }
+        } else if (!isAdminAccount && data.role === ROLES.ADMIN) {
+          try {
+            const { data: updated, error: updateError } = await supabase
+              .from("profiles")
+              .update({ role: ROLES.USER })
+              .eq("id", userId)
+              .select()
+              .single();
+
             if (updateError) {
               console.error("Unable to update profile role:", updateError.message);
               setProfile(data);
@@ -129,6 +150,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
     let finished = false;
+    let sessionTimeoutId;
+    let hardTimeoutId;
 
     const finishLoading = () => {
       if (mounted && !finished) {
@@ -137,28 +160,75 @@ export function AuthProvider({ children }) {
       }
     };
 
-    const init = async () => {
+    const resolveSession = (session, event) => {
+      if (session) return session;
+      if (event === "SIGNED_OUT") return null;
+      const cached = getCachedSession?.();
+      return cached || null;
+    };
+
+    const handleSession = (data, error) => {
+      if (error) {
+        const message = (error.message || "").toLowerCase();
+        if (message.includes("timeout")) {
+          console.warn("getSession timeout - continuing without blocking");
+        } else {
+          console.error("getSession error:", error.message);
+        }
+      }
+
+      const newSession = data?.session ?? null;
+      const resolvedSession = resolveSession(newSession);
+      if (!mounted) return;
+
+      setSession(resolvedSession);
+
+      const authUser = resolvedSession?.user;
+      if (authUser) {
+        fetchProfile(authUser);
+      } else {
+        setProfile(null);
+      }
+
+      finishLoading();
+    };
+
+    const init = () => {
       try {
         setLoading(true);
 
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("getSession error:", error.message);
+        const cachedSession = getCachedSession?.();
+        if (cachedSession?.user && mounted) {
+          setSession(cachedSession);
+          fetchProfile(cachedSession.user);
+          finishLoading();
         }
 
-        const newSession = data?.session ?? null;
-        if (!mounted) return;
+        const sessionPromise = supabase.auth.getSession();
+        sessionTimeoutId = setTimeout(() => {
+          if (!finished && mounted) {
+            if (!hasWarnedSessionSlow && import.meta.env.DEV) {
+              hasWarnedSessionSlow = true;
+              console.warn("AuthContext: getSession is slow, continuing without blocking");
+            }
+            finishLoading();
+          }
+        }, 2500);
 
-        setSession(newSession);
-
-        const authUser = newSession?.user;
-        if (authUser) {
-          fetchProfile(authUser);
-        } else {
-          setProfile(null);
-        }
-
-        finishLoading();
+        sessionPromise
+          .then(({ data, error }) => {
+            clearTimeout(sessionTimeoutId);
+            handleSession(data, error);
+          })
+          .catch((error) => {
+            clearTimeout(sessionTimeoutId);
+            console.error("AuthContext init error:", error);
+            if (mounted) {
+              setSession(null);
+              setProfile(null);
+            }
+            finishLoading();
+          });
       } catch (error) {
         console.error("AuthContext init error:", error);
         if (mounted) {
@@ -169,24 +239,22 @@ export function AuthProvider({ children }) {
       }
     };
 
-    const timeoutId = setTimeout(() => {
+    hardTimeoutId = setTimeout(() => {
       if (!finished && mounted) {
         console.warn("AuthContext: Timeout fallback - forcing loading to false");
         finishLoading();
       }
     }, 8000);
 
-    init().finally(() => {
-      clearTimeout(timeoutId);
-      finishLoading();
-    });
+    init();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!mounted) return;
 
-      setSession(newSession ?? null);
+      const resolvedSession = resolveSession(newSession, event);
+      setSession(resolvedSession);
 
-      const authUser = newSession?.user;
+      const authUser = resolvedSession?.user;
       if (authUser) {
         await fetchProfile(authUser);
         if (event === "SIGNED_IN") {
@@ -201,7 +269,8 @@ export function AuthProvider({ children }) {
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
+      clearTimeout(sessionTimeoutId);
+      clearTimeout(hardTimeoutId);
       sub?.subscription?.unsubscribe();
     };
   }, []);
@@ -236,7 +305,6 @@ export function AuthProvider({ children }) {
 
           try {
             localStorage.removeItem("shopsy_cart");
-            localStorage.removeItem("techphone_wishlist");
           } catch (e) {
             console.warn("Error clearing localStorage:", e);
           }

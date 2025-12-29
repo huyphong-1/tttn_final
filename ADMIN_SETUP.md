@@ -15,13 +15,19 @@
 
 ### Bước 2: Cập nhật Role thành Admin
 1. Vào **SQL Editor** trong Supabase Dashboard
-2. Chạy query sau (thay `USER_UUID` bằng UUID thực tế từ bước 1):
+2. Chạy query sau (thay UUID mẫu bằng UUID thực tế từ bước 1):
 
 ```sql
 -- Tìm UUID của user vừa tạo
 SELECT id, email FROM auth.users WHERE email = 'admin@techphone.com';
 
--- Cập nhật profile thành admin (thay YOUR_USER_UUID)
+-- Lưu ý: Bạn cần tạo user trong Auth trước, sau đó chạy INSERT này với đúng UUID
+
+-- Ví dụ: Nếu bạn đã tạo user admin@techphone.com trong Auth UI
+-- và có UUID là 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+-- thì uncomment và chỉnh sửa dòng dưới:
+
+/*
 INSERT INTO public.profiles (
     id, 
     email, 
@@ -29,19 +35,24 @@ INSERT INTO public.profiles (
     role, 
     phone, 
     address, 
-    city
+    city,
+    created_at,
+    updated_at
 ) VALUES (
-    'YOUR_USER_UUID', -- Thay bằng UUID từ query trên
+    'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', -- Thay bằng UUID thực tế
     'admin@techphone.com',
     'Administrator',
     'admin',
     '0123456789',
     '123 Admin Street',
-    'Hà Nội'
+    'Hà Nội',
+    NOW(),
+    NOW()
 ) ON CONFLICT (id) DO UPDATE SET
     role = 'admin',
     full_name = 'Administrator',
     updated_at = NOW();
+*/
 ```
 
 ## Phương pháp 2: Sử dụng Script Node.js

@@ -29,7 +29,9 @@ import { PERMISSIONS } from "./config/permissions";
 const AdminPage = React.lazy(() => import("./pages/AdminPage"));
 const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
 const ProductManagement = React.lazy(() => import("./pages/admin/ProductManagement"));
+const OrderManagement = React.lazy(() => import("./pages/admin/OrderManagement"));
 const UserManagement = React.lazy(() => import("./pages/admin/UserManagement"));
+const ProfitManagement = React.lazy(() => import("./pages/admin/ProfitManagement"));
 const UserProfile = React.lazy(() => import("./pages/user/UserProfile"));
 
 // Loading component
@@ -119,10 +121,28 @@ export default function App() {
           />
           
           <Route
-            path="/admin/users"
+            path="/admin/cart/*"
+            element={
+              <PermissionRoute permission={PERMISSIONS.ORDER_MANAGE}>
+                <OrderManagement />
+              </PermissionRoute>
+            }
+          />
+          
+          <Route
+            path="/admin/user"
             element={
               <PermissionRoute permission={PERMISSIONS.USER_MANAGE}>
                 <UserManagement />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/admin/profit"
+            element={
+              <PermissionRoute permission={PERMISSIONS.ANALYTICS_VIEW}>
+                <ProfitManagement />
               </PermissionRoute>
             }
           />

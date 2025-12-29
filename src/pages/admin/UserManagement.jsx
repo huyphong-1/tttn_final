@@ -8,43 +8,209 @@ import {
   FiUserPlus,
   FiShield,
   FiMail,
-  FiCalendar,
-  FiMoreVertical
+  FiSave,
+  FiX
 } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { ROLES, PERMISSIONS } from '../../config/permissions';
 import PermissionGuard from '../../components/Guards/PermissionGuard';
 import { supabase } from '../../lib/supabase';
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const DEFAULT_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
+
 const UserManagement = () => {
   const { showSuccess, showError } = useToast();
-  const { hasPermission } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    full_name: '',
+    role: ROLES.USER,
+    status: 'active',
+    password: '',
+    confirm_password: ''
+  });
+
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), SEARCH_DEBOUNCE_MS);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [currentPage, pageSize, filterRole, debouncedSearch]);
+
+  useEffect(() => {
+    setSelectedUsers([]);
+  }, [currentPage, pageSize, filterRole, debouncedSearch]);
+
+  const resetForm = () => {
+    setFormData({
+      email: '',
+      full_name: '',
+      role: ROLES.USER,
+      status: 'active',
+      password: '',
+      confirm_password: ''
+    });
+    setEditingUser(null);
+    setShowModal(false);
+  };
+
+  const openCreateModal = () => {
+    setEditingUser(null);
+    setFormData({
+      email: '',
+      full_name: '',
+      role: ROLES.USER,
+      status: 'active',
+      password: '',
+      confirm_password: ''
+    });
+    setShowModal(true);
+  };
+
+  const handleEditUser = (targetUser) => {
+    setEditingUser(targetUser);
+    setFormData({
+      email: targetUser.email || '',
+      full_name: targetUser.full_name || '',
+      role: targetUser.role || ROLES.USER,
+      status: targetUser.status || 'active',
+      password: '',
+      confirm_password: ''
+    });
+    setShowModal(true);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSaveUser = async (e) => {
+    e.preventDefault();
+
+    const email = (formData.email || '').trim().toLowerCase();
+    const fullName = formData.full_name.trim();
+    const role = formData.role || ROLES.USER;
+    const status = formData.status || 'active';
+    const isEditing = Boolean(editingUser);
+
+    if (!isEditing) {
+      if (!email) {
+        showError('Vui lòng nhập email');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('Email không hợp lệ');
+        return;
+      }
+      if (!formData.password || formData.password.length < 6) {
+        showError('Mật khẩu phải có ít nhất 6 ký tự');
+        return;
+      }
+      if (formData.password !== formData.confirm_password) {
+        showError('Mật khẩu xác nhận không khớp');
+        return;
+      }
+    }
+
+    try {
+      setSaving(true);
+
+      if (isEditing) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ full_name: fullName, role, status })
+          .eq('id', editingUser.id);
+
+        if (error) throw error;
+
+        setUsers(prev =>
+          prev.map(user =>
+            user.id === editingUser.id ? { ...user, full_name: fullName, role, status } : user
+          )
+        );
+        showSuccess('Cập nhật người dùng thành công!');
+      } else {
+        const { data, error } = await supabase.functions.invoke('create-user', {
+          body: {
+            email,
+            password: formData.password,
+            full_name: fullName,
+            role,
+            status
+          }
+        });
+
+        if (error) throw error;
+        if (!data?.user?.id) {
+          throw new Error('Khong the tao nguoi dung');
+        }
+
+        await fetchUsers();
+        showSuccess('Them nguoi dung thanh cong!');
+      }
+
+      resetForm();
+    } catch (error) {
+      console.error(error);
+      showError(error.message || 'Có lỗi xảy ra khi lưu người dùng');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const [
-        { data: profileData, error: profileError },
-        { data: ordersData, error: ordersError }
-      ] = await Promise.all([
-        supabase.from('profiles').select('id, email, full_name, role, status, created_at, last_login'),
-        supabase.from('orders').select('id, user_id, total_amount, status')
-      ]);
+
+      let profileQuery = supabase
+        .from('profiles')
+        .select('id, email, full_name, role, status, created_at, last_login', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      if (filterRole !== 'all') {
+        profileQuery = profileQuery.eq('role', filterRole);
+      }
+
+      if (debouncedSearch) {
+        profileQuery = profileQuery.or(`email.ilike.%${debouncedSearch}%,full_name.ilike.%${debouncedSearch}%`);
+      }
+
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data: profileData, error: profileError, count } = await profileQuery.range(from, to);
 
       if (profileError) throw profileError;
-      if (ordersError) throw ordersError;
+      setTotalCount(typeof count === 'number' ? count : 0);
+
+      const userIds = (profileData || []).map((profile) => profile.id).filter(Boolean);
+      let ordersData = [];
+
+      if (userIds.length > 0) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('user_id, total_amount')
+          .in('user_id', userIds);
+
+        if (error) throw error;
+        ordersData = data || [];
+      }
 
       const orderMap = (ordersData || []).reduce((acc, order) => {
         const key = order.user_id;
@@ -66,7 +232,7 @@ const UserManagement = () => {
       setUsers(normalizedUsers);
     } catch (error) {
       console.error(error);
-      showError('L?i khi t?i danh s?ch ng??i d?ng');
+      showError('Có lỗi xảy ra khi tải người dùng');
     } finally {
       setLoading(false);
     }
@@ -84,10 +250,10 @@ const UserManagement = () => {
         user.id === userId ? { ...user, role: newRole } : user
       );
       setUsers(updatedUsers);
-      showSuccess('C?p nh?t quy?n ng??i d?ng th?nh c?ng!');
+      showSuccess('Cập nhât quyền người dùng thành công!');
     } catch (error) {
       console.error(error);
-      showError('L?i khi c?p nh?t quy?n ng??i d?ng');
+      showError('Lỗi khi cập nhật quyền người dùng');
     }
   };
 
@@ -104,31 +270,31 @@ const UserManagement = () => {
       );
       setUsers(updatedUsers);
       showSuccess(
-        `${newStatus === 'active' ? 'Kich hoat' : 'Vo hieu hoa'} nguoi dung thanh cong!`
+        `${newStatus === 'active' ? 'Kích hoạt' : 'Vô hiệu hoá'} người dùng thành công`
       );
     } catch (error) {
       console.error(error);
-      showError('L?i khi c?p nh?t tr?ng th?i ng??i d?ng');
+      showError('Có lỗi xảy ra khi cập nhật trạng thái người dùng');
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (window.confirm('B?n c? ch?c ch?n mu?n x?a ng??i d?ng n?y?')) {
+    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
       try {
         const { error } = await supabase.from('profiles').delete().eq('id', userId);
         if (error) throw error;
         setUsers(prev => prev.filter(user => user.id !== userId));
-        showSuccess('X?a ng??i d?ng th?nh c?ng!');
+        showSuccess('Xoá người dùng thành công');
       } catch (error) {
         console.error(error);
-        showError('L?i khi x?a ng??i d?ng');
+        showError('Có lỗi xảy ra khi xoá người dùng');
       }
     }
   };
 
   const handleBulkAction = async (action) => {
     if (selectedUsers.length === 0) {
-      showError('Vui l?ng ch?n ?t nh?t m?t ng??i d?ng');
+      showError('Vui lòng chọn ít nhất một người dùng');
       return;
     }
 
@@ -145,7 +311,7 @@ const UserManagement = () => {
               selectedUsers.includes(user.id) ? { ...user, status: 'active' } : user
             )
           );
-          showSuccess('Kich hoat nguoi dung thanh cong!');
+          showSuccess('Kích hoạt người dùng thành công');
           break;
         }
         case 'deactivate': {
@@ -159,18 +325,18 @@ const UserManagement = () => {
               selectedUsers.includes(user.id) ? { ...user, status: 'inactive' } : user
             )
           );
-          showSuccess('Vo hieu hoa nguoi dung thanh cong!');
+          showSuccess('Vô hiệu hoá người dùng thành công');
           break;
         }
         case 'delete': {
-          if (window.confirm('Ban co chac chan muon xoa nguoi dung?')) {
+          if (window.confirm('Bạn có chắc chắn muốn xóa các người dùng đã chọn?')) {
             const { error } = await supabase
               .from('profiles')
               .delete()
               .in('id', selectedUsers);
             if (error) throw error;
             setUsers(prev => prev.filter(user => !selectedUsers.includes(user.id)));
-            showSuccess('Xoa nguoi dung thanh cong!');
+            showSuccess('Xoá người dùng thành công');
           }
           break;
         }
@@ -178,16 +344,11 @@ const UserManagement = () => {
       setSelectedUsers([]);
     } catch (error) {
       console.error(error);
-      showError('L?i khi th?c hi?n thao t?c');
+      showError('Có lỗi xảy ra khi thao tác');
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    return matchesSearch && matchesRole;
-  });
+  const filteredUsers = users;
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -210,6 +371,10 @@ const UserManagement = () => {
       : 'text-red-400 bg-red-900/20';
   };
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount);
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
@@ -231,7 +396,7 @@ const UserManagement = () => {
           
           <PermissionGuard permission={PERMISSIONS.USER_CREATE}>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={openCreateModal}
               className="mt-4 sm:mt-0 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
             >
               <FiUserPlus />
@@ -249,7 +414,10 @@ const UserManagement = () => {
                 type="text"
                 placeholder="Tìm kiếm người dùng..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
                 className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -258,7 +426,10 @@ const UserManagement = () => {
               <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <select
                 value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
+                onChange={(e) => {
+                setFilterRole(e.target.value);
+                setCurrentPage(1);
+              }}
                 className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">Tất cả quyền</option>
@@ -291,7 +462,7 @@ const UserManagement = () => {
             )}
 
             <div className="text-slate-300 flex items-center">
-              Tổng: {filteredUsers.length} người dùng
+              Tong: {totalCount} nguoi dung
             </div>
           </div>
         </div>
@@ -413,7 +584,17 @@ const UserManagement = () => {
                             <FiShield />
                           </button>
                         </PermissionGuard>
-                        
+
+                        <PermissionGuard permission={PERMISSIONS.USER_UPDATE}>
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            className="text-blue-400 hover:text-blue-300 p-1"
+                            title="Chinh sua"
+                          >
+                            <FiEdit2 />
+                          </button>
+                        </PermissionGuard>
+
                         <PermissionGuard permission={PERMISSIONS.USER_DELETE}>
                           <button
                             onClick={() => handleDeleteUser(user.id)}
@@ -430,7 +611,179 @@ const UserManagement = () => {
               </tbody>
             </table>
           </div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-4 border-t border-slate-700">
+            <p className="text-sm text-slate-400">
+              {totalCount > 0
+                ? `Hien thi ${rangeStart}-${rangeEnd} / ${totalCount} nguoi dung`
+                : 'Khong co nguoi dung'}
+            </p>
+            <div className="flex items-center gap-3">
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-sm text-slate-200"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}/page
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || totalCount === 0}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
+              >
+                Truoc
+              </button>
+              <span className="text-sm text-slate-300">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || totalCount === 0}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
         </div>
+
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-800 rounded-lg max-w-lg w-full">
+              <div className="p-6 border-b border-slate-700 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  {editingUser ? 'Chinh sua nguoi dung' : 'Them nguoi dung moi'}
+                </h2>
+                <button onClick={resetForm} className="text-slate-400 hover:text-white">
+                  <FiX />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Email *
+                  </label>
+                  <div className="relative">
+                    <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleFormChange}
+                      disabled={Boolean(editingUser)}
+                      required
+                      className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Ho va ten
+                  </label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    value={formData.full_name}
+                    onChange={handleFormChange}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {!editingUser && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Mat khau *
+                      </label>
+                      <input
+                        type="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleFormChange}
+                        required
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Xac nhan mat khau *
+                      </label>
+                      <input
+                        type="password"
+                        name="confirm_password"
+                        value={formData.confirm_password}
+                        onChange={handleFormChange}
+                        required
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Quyen
+                    </label>
+                    <select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleFormChange}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={ROLES.ADMIN}>Admin</option>
+                      <option value={ROLES.USER}>User</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Trang thai
+                    </label>
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleFormChange}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="active">Hoat dong</option>
+                      <option value="inactive">Vo hieu hoa</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-4 py-2 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    Huy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <FiSave />
+                    {saving ? 'Dang luu...' : 'Luu'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </PermissionGuard>
   );

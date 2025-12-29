@@ -2,8 +2,6 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../lib/supabase";
-import { ROLES } from "../config/permissions";
 import { recordUserRegistration } from "../lib/metrics";
 
 export default function RegisterPage() {
@@ -58,23 +56,7 @@ export default function RegisterPage() {
 
       const authUser = data?.user;
       if (authUser?.id) {
-        try {
-          await supabase
-            .from("profiles")
-            .upsert(
-              {
-                id: authUser.id,
-                email: authUser.email,
-                role: ROLES.USER,
-                status: "active",
-                full_name: authUser.user_metadata?.full_name || "",
-              },
-              { onConflict: "id" }
-            );
-          await recordUserRegistration();
-        } catch (profileError) {
-          console.error("Cannot create profile record:", profileError);
-        }
+        await recordUserRegistration();
       }
 
       // ✅ Auto login nếu Supabase trả session luôn

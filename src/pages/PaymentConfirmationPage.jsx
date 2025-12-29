@@ -76,10 +76,6 @@ export default function PaymentConfirmationPage() {
           <h1 className="text-2xl md:text-3xl font-semibold text-white">
             Đặt hàng thành công
           </h1>
-          <p className="text-slate-300 text-sm mt-1">
-            Cảm ơn bạn đã mua sắm tại TechPhone. Chúng tôi đã gửi email xác nhận
-            tới {order.customer?.email || "email của bạn"}.
-          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <button
@@ -180,7 +176,7 @@ export default function PaymentConfirmationPage() {
           <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
             {order.items?.map((item) => (
               <div key={item.id} className="flex gap-3 border border-slate-700 rounded-xl p-3">
-                <img
+                <img loading="lazy"
                   src={item.image}
                   alt={item.name}
                   className="w-16 h-16 object-cover rounded-lg"
@@ -217,12 +213,6 @@ export default function PaymentConfirmationPage() {
               className="block w-full text-center py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
             >
               Theo dõi đơn hàng
-            </Link>
-            <Link
-              to="/"
-              className="block w-full text-center py-3 rounded-lg border border-slate-600 text-white hover:border-blue-500 transition"
-            >
-              Tiếp tục mua sắm
             </Link>
           </div>
         </aside>

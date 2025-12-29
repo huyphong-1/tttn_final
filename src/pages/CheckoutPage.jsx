@@ -341,7 +341,7 @@ export default function CheckoutPage() {
             <div className="space-y-4 mb-6">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-3">
-                  <img
+                  <img loading="lazy"
                     src={item.image}
                     alt={item.name}
                     className="w-16 h-16 object-cover rounded-lg"

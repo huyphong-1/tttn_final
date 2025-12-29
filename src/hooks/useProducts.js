@@ -4,6 +4,22 @@ import { expandCategoryValues } from "../utils/categoryUtils";
 
 const serializeOptions = (options) => JSON.stringify(options ?? {});
 const hasNumber = (value) => typeof value === "number" && !Number.isNaN(value);
+const PRODUCT_CACHE = new Map();
+
+const getCacheEntry = (key, ttlMs) => {
+  if (!ttlMs || ttlMs <= 0) return null;
+  const entry = PRODUCT_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > ttlMs) {
+    PRODUCT_CACHE.delete(key);
+    return null;
+  }
+  return entry;
+};
+
+const setCacheEntry = (key, payload) => {
+  PRODUCT_CACHE.set(key, { ...payload, timestamp: Date.now() });
+};
 
 export const useProducts = (options = {}) => {
   const [products, setProducts] = useState([]);
@@ -13,8 +29,22 @@ export const useProducts = (options = {}) => {
 
   const deps = useMemo(() => serializeOptions(options), [options]);
 
+  const resolveSelectFields = () => {
+    const fields = typeof options.fields === "string" ? options.fields.trim() : "";
+    return fields.length > 0 ? fields : "*";
+  };
+
+  const resolveCount = () => {
+    if (options.count === null || options.count === false) return null;
+    if (typeof options.count === "string" && options.count.length > 0) return options.count;
+    return "estimated";
+  };
+
   const buildQuery = (applyActiveFilter = true) => {
-    let query = supabase.from("products").select("*", { count: "exact" });
+    const selectFields = resolveSelectFields();
+    const countOption = resolveCount();
+    const selectOptions = countOption ? { count: countOption } : undefined;
+    let query = supabase.from("products").select(selectFields, selectOptions);
     const conditionFilter =
       options.condition === undefined ? "new" : options.condition;
 
@@ -75,9 +105,22 @@ export const useProducts = (options = {}) => {
 
   useEffect(() => {
     let active = true;
+    const cacheTtlMs = Number(options.cacheTtlMs ?? 0);
+    const cacheKey = deps;
 
     const fetchProducts = async () => {
       try {
+        const cached = getCacheEntry(cacheKey, cacheTtlMs);
+        if (cached && active) {
+          setProducts(cached.data || []);
+          setTotalCount(
+            typeof cached.count === "number" ? cached.count : cached.data?.length || 0
+          );
+          setError(null);
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         setError(null);
         console.info("[useProducts] fetch start", options);
@@ -94,12 +137,17 @@ export const useProducts = (options = {}) => {
         if (error) throw error;
 
         if (active) {
-          setProducts(data || []);
-          setTotalCount(typeof count === "number" ? count : data?.length || 0);
+          const nextData = data || [];
+          const nextCount = typeof count === "number" ? count : nextData.length || 0;
+          setProducts(nextData);
+          setTotalCount(nextCount);
           console.info("[useProducts] fetch success", {
-            count: typeof count === "number" ? count : data?.length || 0,
-            items: data?.length || 0,
+            count: typeof count === "number" ? count : nextData.length || 0,
+            items: nextData.length || 0,
           });
+          if (cacheTtlMs > 0) {
+            setCacheEntry(cacheKey, { data: nextData, count: nextCount });
+          }
         }
       } catch (err) {
         if (active) {

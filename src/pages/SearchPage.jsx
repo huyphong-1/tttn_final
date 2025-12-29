@@ -4,6 +4,7 @@ import { FiFilter, FiRefreshCcw, FiSearch, FiX } from "react-icons/fi";
 import { supabase } from "../lib/supabase";
 import { useCart } from "../context/CartContext";
 import { expandCategoryValues } from "../utils/categoryUtils";
+import { PRODUCT_SEARCH_FIELDS } from "../constants/productFields";
 
 const categories = [
   { label: "Tất cả", value: "all" },
@@ -142,7 +143,10 @@ export default function SearchPage() {
         setLoading(true);
         setError(null);
 
-        let query = supabase.from("products").select("*").eq("condition", "new");
+        let query = supabase
+          .from("products")
+          .select(PRODUCT_SEARCH_FIELDS)
+          .eq("condition", "new");
 
         if (filters.keyword) {
           query = query.or(

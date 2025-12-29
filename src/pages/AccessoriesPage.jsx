@@ -6,6 +6,7 @@ import AdvancedFilterBar from "../components/filters/AdvancedFilterBar";
 import Pagination from "../components/Pagination";
 import { BRAND_OPTIONS, SORT_OPTIONS, getSortConfig } from "../constants/filterOptions";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { PRODUCT_LIST_FIELDS } from "../constants/productFields";
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -17,6 +18,7 @@ const toNumberOrNull = (value) => {
 };
 
 const PAGE_SIZE = 12;
+const CACHE_TTL_MS = 60000;
 
 export default function AccessoriesPage() {
   const { addItem } = useCart();
@@ -47,6 +49,8 @@ export default function AccessoriesPage() {
     ascending: sortConfig.ascending,
     pageSize: PAGE_SIZE,
     page,
+    fields: PRODUCT_LIST_FIELDS,
+    cacheTtlMs: CACHE_TTL_MS,
   });
 
   const isFiltering =
@@ -110,7 +114,7 @@ export default function AccessoriesPage() {
             className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden hover:border-blue-500/70 transition"
           >
             <Link to={`/product/${acc.id}`} className="block aspect-[4/3] bg-slate-900">
-              <img
+              <img loading="lazy"
                 src={acc.image}
                 alt={acc.name}
                 className="w-full h-full object-cover transition duration-300 hover:scale-105"

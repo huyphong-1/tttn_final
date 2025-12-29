@@ -68,7 +68,7 @@ const CartPage = () => {
                 className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-center p-4 border-b border-slate-800 last:border-0"
               >
                 <div className="col-span-2 flex items-center space-x-4">
-                  <img
+                  <img loading="lazy"
                     alt={item.name}
                     className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md bg-slate-800"
                     src={item.image}
