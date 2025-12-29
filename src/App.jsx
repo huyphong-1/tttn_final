@@ -2,7 +2,45 @@ import React, { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 
-// Add error boundary for better debugging
+// Pages
+import TestPage from "./pages/TestPage";
+import SimpleTest from "./pages/SimpleTest";
+
+const HomePage = React.lazy(() => import("./pages/HomePage"));
+const PhonesPage = React.lazy(() => import("./pages/PhonesPage"));
+const AccessoriesPage = React.lazy(() => import("./pages/AccessoriesPage"));
+const TabletPage = React.lazy(() => import("./pages/TabletPage"));
+const UsedPage = React.lazy(() => import("./pages/UsedPage"));
+const TrendingPage = React.lazy(() => import("./pages/TrendingPage"));
+const BestSellingPage = React.lazy(() => import("./pages/BestSellingPage"));
+const TopRatedPage = React.lazy(() => import("./pages/TopRatedPage"));
+const CartPage = React.lazy(() => import("./pages/CartPage"));
+const CheckoutPage = React.lazy(() => import("./pages/CheckoutPage"));
+const PaymentConfirmationPage = React.lazy(() =>
+  import("./pages/PaymentConfirmationPage")
+);
+const LoginPage = React.lazy(() => import("./pages/LoginPage"));
+const RegisterPage = React.lazy(() => import("./pages/RegisterPage"));
+const ProductDetailPage = React.lazy(() => import("./pages/ProductDetailPage"));
+const SearchPage = React.lazy(() => import("./pages/SearchPage"));
+const OrderHistory = React.lazy(() => import("./components/OrderHistory"));
+
+// Protected & permissions
+import ProtectedRoute from "./Route/ProtectedRoute";
+import PermissionRoute from "./Route/PermissionRoute";
+import { PERMISSIONS } from "./config/permissions";
+
+// Admin pages
+const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
+const ProductManagement = React.lazy(() =>
+  import("./pages/admin/ProductManagement")
+);
+const OrderManagement = React.lazy(() => import("./pages/admin/OrderManagement"));
+const UserManagement = React.lazy(() => import("./pages/admin/UserManagement"));
+const ProfitManagement = React.lazy(() => import("./pages/admin/ProfitManagement"));
+const UserProfile = React.lazy(() => import("./pages/user/UserProfile"));
+
+// Error boundary for better debugging
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -41,42 +79,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Pages
-const HomePage = React.lazy(() => import("./pages/HomePage"));
-import TestPage from "./pages/TestPage";
-import SimpleTest from "./pages/SimpleTest";
-
-const PhonesPage = React.lazy(() => import("./pages/PhonesPage"));
-const AccessoriesPage = React.lazy(() => import("./pages/AccessoriesPage"));
-const TabletPage = React.lazy(() => import("./pages/TabletPage"));
-const UsedPage = React.lazy(() => import("./pages/UsedPage"));
-const TrendingPage = React.lazy(() => import("./pages/TrendingPage"));
-const BestSellingPage = React.lazy(() => import("./pages/BestSellingPage"));
-const TopRatedPage = React.lazy(() => import("./pages/TopRatedPage"));
-const CartPage = React.lazy(() => import("./pages/CartPage"));
-const CheckoutPage = React.lazy(() => import("./pages/CheckoutPage"));
-const PaymentConfirmationPage = React.lazy(() =>
-  import("./pages/PaymentConfirmationPage")
-);
-const LoginPage = React.lazy(() => import("./pages/LoginPage"));
-const RegisterPage = React.lazy(() => import("./pages/RegisterPage"));
-const ProductDetailPage = React.lazy(() => import("./pages/ProductDetailPage"));
-const SearchPage = React.lazy(() => import("./pages/SearchPage"));
-const OrderHistory = React.lazy(() => import("./components/OrderHistory"));
-
-// Protected & permissions
-import ProtectedRoute from "./Route/ProtectedRoute";
-import PermissionRoute from "./Route/PermissionRoute";
-import { PERMISSIONS } from "./config/permissions";
-
-// Admin pages
-const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
-const ProductManagement = React.lazy(() => import("./pages/admin/ProductManagement"));
-const OrderManagement = React.lazy(() => import("./pages/admin/OrderManagement"));
-const UserManagement = React.lazy(() => import("./pages/admin/UserManagement"));
-const ProfitManagement = React.lazy(() => import("./pages/admin/ProfitManagement"));
-const UserProfile = React.lazy(() => import("./pages/user/UserProfile"));
-
 export default function App() {
   return (
     <ErrorBoundary>
@@ -88,32 +90,30 @@ export default function App() {
         }
       >
         <Routes>
-          {/* Debug routes */}
+          {/* Debug pages */}
           <Route path="/simple" element={<SimpleTest />} />
           <Route path="/test" element={<TestPage />} />
 
-          {/* App with Layout */}
+          {/* Layout routes */}
           <Route element={<Layout />}>
             {/* Home */}
             <Route index element={<HomePage />} />
 
             {/* Main pages */}
-            <Route path="phones" element={<PhonesPage />} />
-            <Route path="accessories" element={<AccessoriesPage />} />
-            <Route path="tablets" element={<TabletPage />} />
-            <Route path="used" element={<UsedPage />} />
-            <Route path="trending" element={<TrendingPage />} />
-            <Route path="best-selling" element={<BestSellingPage />} />
-            <Route path="top-rated" element={<TopRatedPage />} />
-
-            {/* Product/search/cart */}
-            <Route path="product/:id" element={<ProductDetailPage />} />
-            <Route path="search" element={<SearchPage />} />
-            <Route path="cart" element={<CartPage />} />
+            <Route path="/phones" element={<PhonesPage />} />
+            <Route path="/product/:id" element={<ProductDetailPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/accessories" element={<AccessoriesPage />} />
+            <Route path="/tablets" element={<TabletPage />} />
+            <Route path="/used" element={<UsedPage />} />
+            <Route path="/trending" element={<TrendingPage />} />
+            <Route path="/best-selling" element={<BestSellingPage />} />
+            <Route path="/top-rated" element={<TopRatedPage />} />
+            <Route path="/cart" element={<CartPage />} />
 
             {/* Order history */}
             <Route
-              path="order-history"
+              path="/order-history"
               element={
                 <ProtectedRoute>
                   <OrderHistory />
@@ -126,7 +126,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Profile */}
+          {/* User Profile */}
           <Route
             path="/profile"
             element={
@@ -154,7 +154,7 @@ export default function App() {
             }
           />
 
-          {/* Admin */}
+          {/* Admin (giữ nguyên path cũ của bạn) */}
           <Route
             path="/admin"
             element={
@@ -163,6 +163,7 @@ export default function App() {
               </PermissionRoute>
             }
           />
+
           <Route
             path="/admin/products"
             element={
@@ -171,22 +172,25 @@ export default function App() {
               </PermissionRoute>
             }
           />
+
           <Route
-            path="/admin/orders/*"
+            path="/admin/cart/*"
             element={
               <PermissionRoute permission={PERMISSIONS.ORDER_MANAGE}>
                 <OrderManagement />
               </PermissionRoute>
             }
           />
+
           <Route
-            path="/admin/users"
+            path="/admin/user"
             element={
               <PermissionRoute permission={PERMISSIONS.USER_MANAGE}>
                 <UserManagement />
               </PermissionRoute>
             }
           />
+
           <Route
             path="/admin/profit"
             element={

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { FiShoppingCart, FiTrendingUp } from "react-icons/fi";
 import { useCart } from "../context/CartContext";
-import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import { useSupabaseProducts } from "../hooks/useSupabaseProducts";
 import ProductCard from "../components/ProductCard";
 import OptimizedFilterBar from "../components/OptimizedFilterBar";
 import Pagination from "../components/Pagination";
@@ -40,7 +40,7 @@ export default function TrendingPage() {
     setPage(1);
   }, [debouncedKeyword, brand, normalizedMin, normalizedMax, sort]);
 
-  const { products, loading, error, totalCount } = usePrismaProducts({
+  const { products, loading, error, totalCount } = useSupabaseProducts({
     isTrending: true,
     keyword: debouncedKeyword || undefined,
     brand,

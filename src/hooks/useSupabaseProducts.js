@@ -21,49 +21,44 @@ export function useSupabaseProducts(options = {}) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // fields
       const fields = options.fields
-        ? (Array.isArray(options.fields) ? options.fields.join(",") : options.fields)
+        ? Array.isArray(options.fields)
+          ? options.fields.join(",")
+          : options.fields
         : "*";
 
-      // count exact để biết total pages
-      let q = supabase
-        .from("products")
-        .select(fields, { count: "exact" });
+      let q = supabase.from("products").select(fields, { count: "exact" });
 
-      // category filters
       if (options.inCategory?.length) {
-        const cats = Array.isArray(options.inCategory) ? options.inCategory : String(options.inCategory).split(",");
+        const cats = Array.isArray(options.inCategory)
+          ? options.inCategory
+          : String(options.inCategory).split(",");
         q = q.in("category", cats);
       } else if (options.category) {
         q = q.eq("category", options.category);
       }
 
-      // brand
       if (options.brand && options.brand !== "all") q = q.eq("brand", options.brand);
 
-      // keyword (search by name)
       if (typeof options.keyword === "string" && options.keyword.trim()) {
         q = q.ilike("name", `%${options.keyword.trim()}%`);
       }
 
-      // price/rating (allow 0)
-      if (options.priceGte !== null && options.priceGte !== undefined) q = q.gte("price", options.priceGte);
-      if (options.priceLte !== null && options.priceLte !== undefined) q = q.lte("price", options.priceLte);
-      if (options.ratingGte !== null && options.ratingGte !== undefined) q = q.gte("rating", options.ratingGte);
+      if (options.priceGte !== null && options.priceGte !== undefined)
+        q = q.gte("price", options.priceGte);
+      if (options.priceLte !== null && options.priceLte !== undefined)
+        q = q.lte("price", options.priceLte);
+      if (options.ratingGte !== null && options.ratingGte !== undefined)
+        q = q.gte("rating", options.ratingGte);
 
-      // active flag if you have it
       if (options.isActive !== undefined) q = q.eq("is_active", options.isActive);
 
-      // ordering
       if (options.orderBy) {
         q = q.order(options.orderBy, { ascending: !!options.ascending });
       } else {
-        // default newest
         q = q.order("created_at", { ascending: false });
       }
 
-      // pagination
       q = q.range(from, to);
 
       const { data, count, error: qErr } = await q;

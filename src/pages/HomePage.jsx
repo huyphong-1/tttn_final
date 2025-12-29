@@ -2,7 +2,7 @@
 import React, { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import { useSupabaseProducts } from "../hooks/useSupabaseProducts";
 import ProductCard from "../components/ProductCard";
 import CloudinaryImage from "../components/CloudinaryImage";
 import { PRODUCT_LIST_FIELDS } from "../constants/productFields";
@@ -13,7 +13,7 @@ const CACHE_TTL_MS = 300000;
 
 const HomePage = () => {
   const { addItem } = useCart();
-  const { products, loading, error } = usePrismaProducts({
+  const { products, loading, error, totalCount } = useSupabaseProducts({
     inCategory: ["phone", "phones"],
     orderBy: "created_at",
     pageSize: 6,

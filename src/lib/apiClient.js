@@ -1,33 +1,61 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://didongviet.vercel.app/api' : 'http://localhost:3001/api');
+/**
+ * Vercel + Vite best practice:
+ * - Prod: call same-origin serverless endpoints via "/api"
+ * - Dev: if you run a local API server, use "http://localhost:3001/api"
+ * - If you want to override, set VITE_API_BASE_URL in env (Vercel/Local)
+ */
+const DEFAULT_DEV_API = "http://localhost:3001/api";
+const DEFAULT_PROD_API = "/api";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? DEFAULT_DEV_API : DEFAULT_PROD_API);
 
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
 });
+
+// ---- Helpers (optional) ----
+// Supabase token storage keys vary; keep your old key for backward compatibility
+const getAuthToken = () => {
+  // Your previous key (keep)
+  const legacy = localStorage.getItem("supabase.auth.token");
+  if (legacy) return legacy;
+
+  // If later you store your own token key, you can add it here.
+  return null;
+};
 
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
     // Add auth token if available
-    const token = localStorage.getItem('supabase.auth.token');
+    const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.params || config.data);
+
+    if (import.meta.env.DEV) {
+      const method = (config.method || "GET").toUpperCase();
+      // axios baseURL + url
+      console.log(`[API] ${method} ${config.baseURL || ""}${config.url || ""}`, {
+        params: config.params,
+        data: config.data,
+      });
     }
-    
+
     return config;
   },
   (error) => {
-    console.error('[API] Request Error:', error);
+    console.error("[API] Request Error:", error?.message || error);
     return Promise.reject(error);
   }
 );
@@ -35,20 +63,30 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log(`[API] Response ${response.status}:`, response.data);
     }
     return response;
   },
   (error) => {
-    console.error('[API] Response Error:', error.response?.data || error.message);
-    
+    const status = error?.response?.status;
+    const data = error?.response?.data;
+
+    console.error("[API] Response Error:", {
+      status,
+      message: error?.message,
+      data,
+      url: error?.config?.url,
+      baseURL: error?.config?.baseURL,
+      method: error?.config?.method,
+    });
+
     // Handle common errors
-    if (error.response?.status === 401) {
+    if (status === 401) {
       // Unauthorized - redirect to login
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -57,7 +95,7 @@ apiClient.interceptors.response.use(
 export const productsApi = {
   // Get products with filters and pagination
   getProducts: async (params = {}) => {
-    const response = await apiClient.get('/products', { params });
+    const response = await apiClient.get("/products", { params });
     return response.data;
   },
 
@@ -69,8 +107,8 @@ export const productsApi = {
 
   // Search products (for navbar autocomplete)
   searchProducts: async (query, limit = 6) => {
-    const response = await apiClient.get('/products/search', {
-      params: { q: query, limit }
+    const response = await apiClient.get("/products/search", {
+      params: { q: query, limit },
     });
     return response.data;
   },
@@ -86,7 +124,7 @@ export const profilesApi = {
 
   // Create user profile
   createProfile: async (profileData) => {
-    const response = await apiClient.post('/profiles', profileData);
+    const response = await apiClient.post("/profiles", profileData);
     return response.data;
   },
 
@@ -107,8 +145,8 @@ export const profilesApi = {
 export const ordersApi = {
   // Get user orders
   getOrders: async (userId, params = {}) => {
-    const response = await apiClient.get('/orders', {
-      params: { user_id: userId, ...params }
+    const response = await apiClient.get("/orders", {
+      params: { user_id: userId, ...params },
     });
     return response.data;
   },
@@ -116,14 +154,14 @@ export const ordersApi = {
   // Get single order
   getOrder: async (orderId, userId) => {
     const response = await apiClient.get(`/orders/${orderId}`, {
-      params: userId ? { user_id: userId } : {}
+      params: userId ? { user_id: userId } : {},
     });
     return response.data;
   },
 
   // Create new order
   createOrder: async (orderData) => {
-    const response = await apiClient.post('/orders', orderData);
+    const response = await apiClient.post("/orders", orderData);
     return response.data;
   },
 
@@ -143,33 +181,33 @@ export const ordersApi = {
 // Generic API utilities
 export const apiUtils = {
   // Handle API errors consistently
-  handleError: (error, defaultMessage = 'An error occurred') => {
-    if (error.response?.data?.error) {
-      return error.response.data.error;
-    }
-    if (error.message) {
-      return error.message;
-    }
+  handleError: (error, defaultMessage = "An error occurred") => {
+    if (error?.response?.data?.error) return error.response.data.error;
+    if (error?.response?.data?.message) return error.response.data.message;
+    if (error?.message) return error.message;
     return defaultMessage;
   },
 
   // Build query string from object
   buildQueryString: (params) => {
-    const filtered = Object.entries(params)
-      .filter(([_, value]) => value !== null && value !== undefined && value !== '')
+    const filtered = Object.entries(params || {})
+      .filter(([_, value]) => value !== null && value !== undefined && value !== "")
       .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-      .join('&');
-    return filtered ? `?${filtered}` : '';
+      .join("&");
+    return filtered ? `?${filtered}` : "";
   },
 
   // Check if API is healthy
   healthCheck: async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL.replace('/api', '')}/health`);
+      // If API_BASE_URL is "/api" => origin = "" ; else strip "/api"
+      const origin =
+        API_BASE_URL.startsWith("http") ? API_BASE_URL.replace(/\/api\/?$/, "") : "";
+      const response = await axios.get(`${origin}/health`);
       return response.data;
     } catch (error) {
-      console.error('[API] Health check failed:', error);
-      return { status: 'ERROR', error: error.message };
+      console.error("[API] Health check failed:", error?.message || error);
+      return { status: "ERROR", error: error?.message || String(error) };
     }
   },
 };

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import { useSupabaseProducts } from "../hooks/useSupabaseProducts";
 import ProductCard from "../components/ProductCard";
 import OptimizedFilterBar from "../components/OptimizedFilterBar";
 import Pagination from "../components/Pagination";
@@ -36,7 +36,7 @@ export default function TabletPage() {
   const debouncedKeyword = useDebouncedValue(q.trim(), 300);
   const sortConfig = useMemo(() => getSortConfig(SORT_OPTIONS, sort), [sort]);
 
-  const { products, loading, error, totalCount } = usePrismaProducts({
+  const { products, loading, error, totalCount } = useSupabaseProducts({
     inCategory: ["tablet"],
     keyword: debouncedKeyword || undefined,
     brand,
