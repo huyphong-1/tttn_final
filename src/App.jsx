@@ -40,6 +40,7 @@ class ErrorBoundary extends React.Component {
 }
 
 import HomePage from "./pages/HomePage";
+import TestPage from "./pages/TestPage";
 const PhonesPage = React.lazy(() => import("./pages/PhonesPage"));
 const AccessoriesPage = React.lazy(() => import("./pages/AccessoriesPage"));
 const TabletPage = React.lazy(() => import("./pages/TabletPage"));
@@ -78,8 +79,11 @@ export default function App() {
       }>
         <Routes>
           <Route element={<Layout />}>
+            {/* Test page for debugging */}
+            <Route path="/test" element={<TestPage />} />
+            
             {/* Các trang chính */}
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<TestPage />} />
             <Route path="/phones" element={<PhonesPage />} />
             <Route path="/product/:id" element={<ProductDetailPage />} />
             <Route path="/search" element={<SearchPage />} />
