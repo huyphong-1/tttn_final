@@ -2,8 +2,7 @@ import React, { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 
-// Lazy load các trang để tối ưu performance
-const HomePage = React.lazy(() => import("./pages/HomePage"));
+import HomePage from "./pages/HomePage";
 const PhonesPage = React.lazy(() => import("./pages/PhonesPage"));
 const AccessoriesPage = React.lazy(() => import("./pages/AccessoriesPage"));
 const TabletPage = React.lazy(() => import("./pages/TabletPage"));
@@ -22,7 +21,7 @@ const OrderHistory = React.lazy(() => import('./components/OrderHistory'));
 
 // Import ProtectedRoute và AdminRoute
 import ProtectedRoute from "./Route/ProtectedRoute";
-import AdminRoute from "./Route/AdminRoute";
+import { PrismaAuthProvider } from "./context/PrismaAuthContext";
 import PermissionRoute from "./Route/PermissionRoute";
 import { PERMISSIONS } from "./config/permissions";
 

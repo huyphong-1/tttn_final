@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileCache, setProfileCache] = useState(new Map());
 
   const fetchProfile = async (authUser) => {
     if (!authUser?.id) {
@@ -27,12 +28,25 @@ export function AuthProvider({ children }) {
 
     const userId = authUser.id;
 
+    const cached = profileCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < 300000) {
+      setProfile(cached.data);
+      return;
+    }
+
     try {
-      const { data, error } = await supabase
+      const profilePromise = supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .maybeSingle();
+
+      const { data, error } = await Promise.race([
+        profilePromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
+        )
+      ]);
 
       if (error) {
         console.error("fetchProfile error:", error.message);
@@ -116,6 +130,11 @@ export function AuthProvider({ children }) {
           }
         } else {
           setProfile(data);
+          // Cache successful profile data
+          setProfileCache(prev => new Map(prev.set(userId, {
+            data: data,
+            timestamp: Date.now()
+          })));
         }
       }
     } catch (error) {
@@ -213,7 +232,7 @@ export function AuthProvider({ children }) {
             }
             finishLoading();
           }
-        }, 2500);
+        }, 500);
 
         sessionPromise
           .then(({ data, error }) => {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../hooks/usePrismaAuth';
 import { useToast } from './ToastContext';
 
 const WishlistContext = createContext(null);

@@ -1,622 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FiPlus, 
-  FiEdit2, 
-  FiTrash2, 
-  FiSearch, 
-  FiFilter,
-  FiEye,
-  FiUpload,
-  FiSave,
-  FiX
-} from 'react-icons/fi';
-import { useToast } from '../../context/ToastContext';
+import React, { useState } from 'react';
+import { FiPlus } from 'react-icons/fi';
+import { useProductManagement } from '../../hooks/useProductManagement';
+import ProductFilters from '../../components/ProductFilters/ProductFilters';
+import ProductTable from '../../components/ProductTable/ProductTable';
+import ProductPagination from '../../components/ProductPagination/ProductPagination';
+import ProductModal from '../../components/ProductModal/ProductModal';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { supabase } from '../../lib/supabase';
-import { validateProduct } from '../../utils/validation';
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
-const DEFAULT_PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
 const ProductManagement = () => {
-  const { showSuccess, showError } = useToast();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+  // Use custom hook for product management
+  const {
+    products,
+    totalCount,
+    loading,
+    saving,
+    currentPage,
+    pageSize,
+    totalPages,
+    hasNextPage,
+    hasPrevPage,
+    searchTerm,
+    filterCategory,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    handleSearch,
+    handleCategoryFilter,
+    handlePageChange,
+    handlePageSizeChange
+  } = useProductManagement();
+
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    phones: '',
-    stock: '',
-    image: '',
-    brand: '',
-    specifications: '',
-    discount: 0,
-    featured: false,
-    status: 'active'
-  });
 
-  const categories = [
-    'phones',
-    'accessories', 
-    'tablets',
-    'laptops',
-    'smartwatch',
-    'headphones'
-  ];
+  // Debounced search
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, SEARCH_DEBOUNCE_MS);
 
-  const debouncedSearch = useDebouncedValue(searchTerm.trim(), SEARCH_DEBOUNCE_MS);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [currentPage, pageSize, filterCategory, debouncedSearch]);
-
-    const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      let query = supabase
-        .from('products')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false });
-
-      if (filterCategory !== 'all') {
-        query = query.eq('category', filterCategory);
-      }
-
-      if (debouncedSearch) {
-        query = query.or(`name.ilike.%${debouncedSearch}%,brand.ilike.%${debouncedSearch}%`);
-      }
-
-      const from = (currentPage - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, error, count } = await query.range(from, to);
-
-      if (error) throw error;
-      setProducts(data || []);
-      setTotalCount(typeof count === 'number' ? count : 0);
-    } catch (error) {
-      console.error(error);
-      showError('Lỗi khi tải danh sách sản phẩm');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      validateProduct(formData);
-
-      if (editingProduct) {
-        const payload = {
-          ...formData,
-          price: Number(formData.price),
-          stock: Number(formData.stock),
-          discount: Number(formData.discount) || 0,
-          featured: Boolean(formData.featured),
-          status: formData.status || 'active'
-        };
-        const { error } = await supabase
-          .from('products')
-          .update(payload)
-          .eq('id', editingProduct.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        await fetchProducts();
-        showSuccess('C?p nh?t s?n ph?m th?nh c?ng!');
-      } else {
-        const payload = {
-          ...formData,
-          price: Number(formData.price),
-          stock: Number(formData.stock),
-          discount: Number(formData.discount) || 0,
-          featured: Boolean(formData.featured),
-          status: formData.status || 'active'
-        };
-        const { error } = await supabase
-          .from('products')
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) throw error;
-        await fetchProducts();
-        showSuccess('Th?m s?n ph?m th?nh c?ng!');
-      }
-
-      resetForm();
-    } catch (error) {
-      console.error(error);
-      showError(error.message || 'C? l?i x?y ra');
-    }
-  };
-
-  const handleEdit = (product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      description: product.description,
-      price: product.price.toString(),
-      category: product.category,
-      stock: product.stock.toString(),
-      image: product.image,
-      brand: product.brand,
-      specifications: product.specifications,
-      discount: product.discount,
-      featured: product.featured,
-      status: product.status
-    });
+  // Modal handlers
+  const handleAddProduct = () => {
+    setEditingProduct(null);
     setShowModal(true);
   };
 
-  const handleDelete = async (productId) => {
-    if (window.confirm('B?n c? ch?c ch?n mu?n x?a s?n ph?m n?y?')) {
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
+    setShowModal(true);
+  };
+
+  const handleViewProduct = (product) => {
+    // For now, just edit - can implement view modal later
+    handleEditProduct(product);
+  };
+
+  const handleDeleteProduct = async (product) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${product.name}"?`)) {
       try {
-        const { error } = await supabase.from('products').delete().eq('id', productId);
-        if (error) throw error;
-        setProducts(prev => prev.filter(p => p.id !== productId));
-        showSuccess('X?a s?n ph?m th?nh c?ng!');
+        await deleteProduct(product.id);
       } catch (error) {
-        console.error(error);
-        showError('L?i khi x?a s?n ph?m');
+        console.error('Delete failed:', error);
       }
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      category: '',
-      stock: '',
-      image: '',
-      brand: '',
-      specifications: '',
-      discount: 0,
-      featured: false,
-      status: 'active'
-    });
-    setEditingProduct(null);
+  const handleSaveProduct = async (productData) => {
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productData);
+      } else {
+        await createProduct(productData);
+      }
+      setShowModal(false);
+      setEditingProduct(null);
+    } catch (error) {
+      console.error('Save failed:', error);
+      // Error is handled by the hook and toast is shown
+    }
+  };
+
+  const handleCloseModal = () => {
     setShowModal(false);
+    setEditingProduct(null);
   };
-
-  const filteredProducts = products;
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(price);
-  };
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const rangeEnd = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount);
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-        <p className="mt-4 text-slate-300">Đang tải sản phẩm...</p>
+      <div className="min-h-screen bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-slate-300">Đang tải sản phẩm...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Quản lý sản phẩm</h1>
-          <p className="text-slate-300">Quản lý danh sách sản phẩm trong cửa hàng</p>
+    <div className="min-h-screen bg-slate-900 text-white">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Quản lý sản phẩm
+            </h1>
+            <p className="text-slate-300">
+              Quản lý danh sách sản phẩm trong cửa hàng
+            </p>
+          </div>
+          <button
+            onClick={handleAddProduct}
+            className="mt-4 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors font-medium"
+          >
+            <FiPlus className="w-5 h-5" />
+            Thêm sản phẩm
+          </button>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="mt-4 sm:mt-0 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <FiPlus />
-          Thêm sản phẩm
-        </button>
-      </div>
 
       {/* Filters */}
-      <div className="bg-slate-800 rounded-lg p-6 mb-6 border border-slate-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm sản phẩm..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div className="relative">
-            <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <select
-              value={filterCategory}
-              onChange={(e) => {
-                setFilterCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Tất cả danh mục</option>
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-            <div className="text-slate-300 flex items-center">
-              Tong: {totalCount} san pham
-            </div>
-        </div>
-      </div>
+      <ProductFilters
+        searchTerm={searchTerm}
+        onSearchChange={handleSearch}
+        filterCategory={filterCategory}
+        onCategoryChange={handleCategoryFilter}
+        pageSize={pageSize}
+        onPageSizeChange={handlePageSizeChange}
+        totalCount={totalCount}
+      />
 
       {/* Products Table */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Sản phẩm
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Danh mục
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Giá
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Kho
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Trạng thái
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-slate-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <img loading="lazy" 
-                        src={product.image} 
-                        alt={product.name}
-                        className="w-12 h-12 rounded-lg object-cover mr-4"
-                        onError={(e) => {
-                          e.target.src = '/placeholder-product.jpg';
-                        }}
-                      />
-                      <div>
-                        <div className="text-sm font-medium text-white">{product.name}</div>
-                        <div className="text-sm text-slate-400">{product.brand}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-                      {product.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                    {formatPrice(product.price)}
-                    {product.discount > 0 && (
-                      <span className="ml-2 text-xs text-red-400">(-{product.discount}%)</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                    <span className={`${product.stock < 10 ? 'text-red-400' : 'text-green-400'}`}>
-                      {product.stock}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      product.status === 'active' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                    }`}>
-                      {product.status === 'active' ? 'Hoạt động' : 'Tạm dừng'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="text-blue-400 hover:text-blue-300 p-1"
-                        title="Chỉnh sửa"
-                      >
-                        <FiEdit2 />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="text-red-400 hover:text-red-300 p-1"
-                        title="Xóa"
-                      >
-                        <FiTrash2 />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-4 border-t border-slate-700">
-            <p className="text-sm text-slate-400">
-              {totalCount > 0
-                ? `Hien thi ${rangeStart}-${rangeEnd} / ${totalCount} san pham`
-                : 'Khong co san pham'}
-            </p>
-            <div className="flex items-center gap-3">
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-sm text-slate-200"
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}/page
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1 || totalCount === 0}
-                className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
-              >
-                Truoc
-              </button>
-              <span className="text-sm text-slate-300">
-                Trang {currentPage} / {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages || totalCount === 0}
-                className="px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-500 hover:text-blue-400 transition"
-              >
-                Sau
-              </button>
-            </div>
-          </div>
+      <ProductTable
+        products={products}
+        onEdit={handleEditProduct}
+        onDelete={handleDeleteProduct}
+        onView={handleViewProduct}
+        loading={loading}
+      />
+
+      {/* Pagination */}
+      <ProductPagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        hasNextPage={hasNextPage}
+        hasPrevPage={hasPrevPage}
+        onPageChange={handlePageChange}
+        totalCount={totalCount}
+        pageSize={pageSize}
+      />
+
+      {/* Product Modal */}
+      <ProductModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        product={editingProduct}
+        onSave={handleSaveProduct}
+        loading={saving}
+      />
       </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white">
-                {editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="text-slate-400 hover:text-white"
-              >
-                <FiX />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Tên sản phẩm *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Thương hiệu *
-                  </label>
-                  <input
-                    type="text"
-                    name="brand"
-                    value={formData.brand}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Giá (VND) *
-                  </label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Số lượng *
-                  </label>
-                  <input
-                    type="number"
-                    name="stock"
-                    value={formData.stock}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Danh mục *
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Chọn danh mục</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Giảm giá (%)
-                  </label>
-                  <input
-                    type="number"
-                    name="discount"
-                    value={formData.discount}
-                    onChange={handleInputChange}
-                    min="0"
-                    max="100"
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Mô tả
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows="3"
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Thông số kỹ thuật
-                </label>
-                <textarea
-                  name="specifications"
-                  value={formData.specifications}
-                  onChange={handleInputChange}
-                  rows="2"
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  URL hình ảnh
-                </label>
-                <input
-                  type="url"
-                  name="image"
-                  value={formData.image}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="featured"
-                    checked={formData.featured}
-                    onChange={handleInputChange}
-                    className="mr-2"
-                  />
-                  <span className="text-slate-300">Sản phẩm nổi bật</span>
-                </label>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Trạng thái
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="active">Hoạt động</option>
-                    <option value="inactive">Tạm dừng</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-4 pt-4">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white flex items-center gap-2 transition-colors"
-                >
-                  <FiSave />
-                  {editingProduct ? 'Cập nhật' : 'Thêm mới'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

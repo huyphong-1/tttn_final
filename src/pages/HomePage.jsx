@@ -1,17 +1,19 @@
 // src/pages/HomePage.jsx
-import React from "react";
+import React, { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { useProducts } from "../hooks/useProducts";
+import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import ProductCard from "../components/ProductCard";
+import CloudinaryImage from "../components/CloudinaryImage";
 import { PRODUCT_LIST_FIELDS } from "../constants/productFields";
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
-const CACHE_TTL_MS = 60000;
+const CACHE_TTL_MS = 300000;
 
 const HomePage = () => {
   const { addItem } = useCart();
-  const { products, loading, error } = useProducts({
+  const { products, loading, error } = usePrismaProducts({
     inCategory: ["phone", "phones"],
     orderBy: "created_at",
     pageSize: 6,
@@ -23,7 +25,7 @@ const HomePage = () => {
   const heroProduct = products[0];
   const showEmpty = !loading && !error && products.length === 0;
 
-  const handleAddToCart = (product) => {
+  const handleAddToCart = useCallback((product) => {
     addItem({
       id: `home-${product.id}`,
       productId: product.id,
@@ -31,7 +33,7 @@ const HomePage = () => {
       price: Number(product.price),
       image: product.image,
     });
-  };
+  }, [addItem]);
 
   return (
     <div className="bg-slate-950 text-slate-50 flex-1">
@@ -85,10 +87,12 @@ const HomePage = () => {
 
             <div className="relative border border-slate-800 rounded-3xl bg-slate-900/60 p-4 md:p-6 shadow-xl shadow-slate-900/80">
               <div className="aspect-[4/5] rounded-2xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center mb-4">
-                <img
-                  src={heroProduct?.image || "/phones/iphone15pm.jpg"}
+                <CloudinaryImage
+                  publicId={heroProduct?.image}
                   alt={heroProduct?.name || "Flagship"}
-                  className="w-full h-full object-cover"
+                  preset="PRODUCT_DETAIL"
+                  className="w-full h-full"
+                  fallbackSrc="/products/iphone-15-pro-max-256gb.png"
                 />
               </div>
 
@@ -127,36 +131,11 @@ const HomePage = () => {
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {products.map((p) => (
-                <div
+                <ProductCard
                   key={p.id}
-                  className="group border border-slate-800 rounded-2xl bg-slate-900/60 overflow-hidden hover:border-blue-500/70 hover:shadow-lg hover:shadow-blue-500/10 transition"
-                >
-                  <Link
-                    to={`/product/${p.id}`}
-                    className="relative aspect-[3/4] bg-slate-900 overflow-hidden block"
-                  >
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                  </Link>
-                  <div className="p-3 space-y-2">
-                    <Link to={`/product/${p.id}`}>
-                      <p className="font-semibold text-sm line-clamp-2 hover:text-blue-400 transition">
-                        {p.name}
-                      </p>
-                    </Link>
-                    <p className="text-sm text-blue-400">{formatPrice(p.price)}</p>
-                    <button
-                      onClick={() => handleAddToCart(p)}
-                      className="mt-2 text-[11px] px-3 py-1.5 rounded-full bg-blue-500 hover:bg-blue-600 font-medium transition"
-                    >
-                      Thêm vào giỏ
-                    </button>
-                  </div>
-                </div>
+                  product={p}
+                  onAddToCart={handleAddToCart}
+                />
               ))}
             </div>
           )}

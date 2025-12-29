@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/usePrismaAuth';
 import { PERMISSIONS } from '../config/permissions';
 
 const PermissionRoute = ({ 
@@ -11,8 +11,18 @@ const PermissionRoute = ({
   redirectTo = "/",
   showUnauthorized = false 
 }) => {
-  const { hasPermission, hasAnyPermission, hasAllPermissions, loading } = useAuth();
+  const { hasPermission, hasAnyPermission, hasAllPermissions, loading, profile, role } = useAuth();
   const location = useLocation();
+
+  // Debug logging
+  console.log('[PermissionRoute] Debug:', {
+    permission,
+    permissions,
+    profile,
+    role,
+    loading,
+    hasPermissionFunc: typeof hasPermission
+  });
 
   if (loading) {
     return (
@@ -27,12 +37,14 @@ const PermissionRoute = ({
 
   if (permission) {
     hasAccess = hasPermission(permission);
+    console.log('[PermissionRoute] Permission check:', permission, '→', hasAccess);
   } else if (permissions && Array.isArray(permissions)) {
     if (requireAll) {
       hasAccess = hasAllPermissions(permissions);
     } else {
       hasAccess = hasAnyPermission(permissions);
     }
+    console.log('[PermissionRoute] Permissions check:', permissions, '→', hasAccess);
   } else {
     hasAccess = true;
   }

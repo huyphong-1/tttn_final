@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FiPlus, FiTrash2, FiMail, FiShield, FiUsers } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/usePrismaAuth';
 import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAILS, isAdminEmail } from '../../config/adminConfig';

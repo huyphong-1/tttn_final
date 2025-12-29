@@ -1,7 +1,7 @@
 import React from 'react';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { useWishlist } from '../context/WishlistContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/usePrismaAuth';
 import { useToast } from '../context/ToastContext';
 import { PERMISSIONS } from '../config/permissions';
 

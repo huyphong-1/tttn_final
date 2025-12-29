@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { FiFilter, FiRefreshCw, FiSearch } from 'react-icons/fi';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { supabase } from '../../lib/supabase';
@@ -42,6 +42,13 @@ const getItemsCount = (items) => {
     }
   }
   return 0;
+};
+
+const parseDate = (dateString) => {
+  if (!dateString) return null;
+  const date = new Date(`${dateString}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()];
 };
 
 const getDayRange = (value) => {
@@ -142,7 +149,13 @@ const OrderManagement = () => {
     }
   }, [totalCount, currentPage, pageSize]);
 
-      return orders.filter((order) => {
+  const filteredOrders = useMemo(() => {
+    const term = debouncedSearch.toLowerCase();
+    const dateParts = parseDate(dateFilter);
+    const monthValue = monthFilter ? parseInt(monthFilter, 10) : null;
+    const yearValue = yearFilter ? parseInt(yearFilter, 10) : null;
+    
+    return orders.filter((order) => {
       const orderNumber = `${order.order_number || order.id}`.toLowerCase();
       const matchesTerm = term ? orderNumber.includes(term) : true;
       if (!matchesTerm) return false;
@@ -169,7 +182,7 @@ const OrderManagement = () => {
 
       return true;
     });
-  }, [orders, searchTerm, dateFilter, monthFilter, yearFilter]);
+  }, [orders, debouncedSearch, dateFilter, monthFilter, yearFilter]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const startIndex = (currentPage - 1) * pageSize;

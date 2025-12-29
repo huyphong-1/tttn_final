@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../../context/CartContext";
+import CloudinaryImage from "../CloudinaryImage";
 
 const ProductsPage = () => {
   const { addItem } = useCart();
@@ -31,10 +32,12 @@ const ProductsPage = () => {
             className="bg-slate-900 p-4 rounded-lg shadow border border-slate-700"
           >
             <Link to={`/product/${p.id}`} className="block rounded overflow-hidden mb-3">
-              <img
-                src={p.image}
+              <CloudinaryImage
+                publicId={p.image}
                 alt={p.name}
-                className="w-full h-60 object-cover transition duration-300 hover:scale-105"
+                preset="PRODUCT_CARD"
+                className="w-full h-60 transition duration-300 hover:scale-105"
+                loading="lazy"
               />
             </Link>
             <Link to={`/product/${p.id}`}>

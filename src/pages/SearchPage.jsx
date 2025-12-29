@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { FiFilter, FiRefreshCcw, FiSearch, FiX } from "react-icons/fi";
 import { supabase } from "../lib/supabase";
 import { useCart } from "../context/CartContext";
+import CloudinaryImage from "../components/CloudinaryImage";
 import { expandCategoryValues } from "../utils/categoryUtils";
 import { PRODUCT_SEARCH_FIELDS } from "../constants/productFields";
 
@@ -507,11 +508,12 @@ export default function SearchPage() {
                   className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden hover:border-blue-500/70 transition"
                 >
                   <Link to={`/product/${product.id}`} className="block aspect-[4/5] bg-slate-900 overflow-hidden">
-                    <img
-                      src={product.image}
+                    <CloudinaryImage
+                      publicId={product.image}
                       alt={product.name}
-                      className="w-full h-full object-cover transition duration-300 hover:scale-105"
-                      loading="lazy"
+                      preset="PRODUCT_CARD"
+                      className="w-full h-full transition duration-300 hover:scale-105"
+                      enableProgressiveLoading={true}
                     />
                   </Link>
                   <div className="p-4 space-y-2">

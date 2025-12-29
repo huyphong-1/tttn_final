@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { FiArrowLeft, FiShoppingCart } from "react-icons/fi";
 import { useCart } from "../context/CartContext";
 import { supabase } from "../lib/supabase";
+import CloudinaryImage from "../components/CloudinaryImage";
 
 const formatPrice = (value) =>
   Number(value || 0).toLocaleString("vi-VN", {
@@ -175,10 +176,11 @@ const ProductDetailPage = () => {
       <div className="grid md:grid-cols-2 gap-10">
         <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6">
           <div className="aspect-square rounded-2xl overflow-hidden bg-slate-900 flex items-center justify-center">
-            <img
-              src={product.image}
+            <CloudinaryImage
+              publicId={product.image}
               alt={product.name}
-              className="w-full h-full object-cover"
+              preset="PRODUCT_DETAIL"
+              className="w-full h-full"
               loading="lazy"
             />
           </div>

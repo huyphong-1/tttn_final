@@ -10,7 +10,7 @@ import {
   FiStar,
   FiEye
 } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/usePrismaAuth';
 import { supabase } from '../../lib/supabase';
 
 const isSameDay = (value, baseDate = new Date()) => {

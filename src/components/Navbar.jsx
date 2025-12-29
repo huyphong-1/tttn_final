@@ -8,7 +8,8 @@ import { FaCaretDown } from "react-icons/fa";
 import { FaHistory, FaHeart } from "react-icons/fa";  // Thêm icon History và Heart từ react-icons
 import DarkMode from "./DarkMode";
 import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { productsApi } from "../lib/apiClient";
+import { useAuth } from "../hooks/usePrismaAuth";
 import { AdminOnly } from "./Guards/RoleGuard";
 import PermissionGuard from "./Guards/PermissionGuard";
 import { PERMISSIONS } from "../config/permissions";
@@ -27,43 +28,35 @@ const Navbar = ({ handleOrderPopup }) => {
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
-  const { user, signOut, profile, role, isAdmin } = useAuth();
-  
-  
-  // ✅ Search state
+  const { user, signOut, profile, role, isAdmin, loading: authLoading } = useAuth();
+
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState([]);
   const [openSuggest, setOpenSuggest] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // ✅ Dropdown click-state (CÁCH A)
   const [openTrending, setOpenTrending] = useState(false);
   const trendingRef = useRef(null);
 
-  // Hàm handle đăng xuất
   const handleSignOut = async () => {
-    if (isSigningOut) return; // Prevent double click
+    if (isSigningOut) return; 
     
     try {
       setIsSigningOut(true);
-      
-      // Sử dụng signOut từ AuthContext
+
       await signOut();
-      
-      // Chuyển hướng về trang chủ
+
       navigate("/", { replace: true });
       
     } catch (error) {
       console.error("Lỗi khi đăng xuất:", error);
-      // Vẫn chuyển hướng về trang chủ ngay cả khi có lỗi
       navigate("/", { replace: true });
     } finally {
       setIsSigningOut(false);
     }
   };
 
-  // ✅ Click outside => đóng dropdown Trending
   useEffect(() => {
     const onClickOutside = (e) => {
       if (trendingRef.current && !trendingRef.current.contains(e.target)) {
@@ -81,33 +74,25 @@ const Navbar = ({ handleOrderPopup }) => {
     if (!q) {
       setResults([]);
       setOpenSuggest(false);
-      setLoading(false);
+      setSearchLoading(false);
       return;
     }
 
-    setLoading(true);
+    setSearchLoading(true);
 
     const t = setTimeout(async () => {
       try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id,name,price,image,category")
-          .ilike("name", `%${q}%`)
-          .limit(6);
+        // Use API client for search
+        const { data } = await productsApi.searchProducts(q, 6);
 
-        if (error) {
-          console.error("Supabase search error:", error);
-          setResults([]);
-        } else {
-          setResults(data || []);
-        }
+        setResults(data || []);
         setOpenSuggest(true);
       } catch (err) {
         console.error(err);
         setResults([]);
         setOpenSuggest(true);
       } finally {
-        setLoading(false);
+        setSearchLoading(false);
       }
     }, 300);
 

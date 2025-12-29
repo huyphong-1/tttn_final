@@ -2,7 +2,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-
+import CloudinaryImage from "../components/CloudinaryImage";
 
 const formatPrice = (n) =>
   n.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -68,10 +68,12 @@ const CartPage = () => {
                 className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-center p-4 border-b border-slate-800 last:border-0"
               >
                 <div className="col-span-2 flex items-center space-x-4">
-                  <img loading="lazy"
+                  <CloudinaryImage
+                    publicId={item.image}
                     alt={item.name}
-                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md bg-slate-800"
-                    src={item.image}
+                    preset="PRODUCT_THUMB"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-md bg-slate-800"
+                    loading="lazy"
                   />
                   <div>
                     <h3 className="font-semibold text-sm">{item.name}</h3>

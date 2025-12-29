@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "../hooks/usePrismaAuth";
 import { useToast } from "./ToastContext";
 
 const CartContext = createContext(null);

@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { FiShoppingCart } from "react-icons/fi";
 import { useCart } from "../context/CartContext";
-import { useProducts } from "../hooks/useProducts";
-import AdvancedFilterBar from "../components/filters/AdvancedFilterBar";
+import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import ProductCard from "../components/ProductCard";
+import OptimizedFilterBar from "../components/OptimizedFilterBar";
 import Pagination from "../components/Pagination";
 import { BRAND_OPTIONS, SORT_OPTIONS, getSortConfig } from "../constants/filterOptions";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
@@ -18,7 +19,7 @@ const toNumberOrNull = (value) => {
 };
 
 const PAGE_SIZE = 12;
-const CACHE_TTL_MS = 60000;
+const CACHE_TTL_MS = 300000;
 export default function UsedPage() {
   const { addItem } = useCart();
 
@@ -38,7 +39,7 @@ export default function UsedPage() {
     setPage(1);
   }, [debouncedKeyword, brand, normalizedMin, normalizedMax, sort]);
 
-  const { products, loading, error, totalCount } = useProducts({
+  const { products, loading, error, totalCount } = usePrismaProducts({
     condition: "used",
     keyword: debouncedKeyword || undefined,
     brand,
@@ -64,7 +65,7 @@ export default function UsedPage() {
     setPage(1);
   };
 
-  const handleAdd = (product) => {
+  const handleAdd = useCallback((product) => {
     addItem({
       id: `used-${product.id}`,
       productId: product.id,
@@ -72,7 +73,7 @@ export default function UsedPage() {
       price: Number(product.price),
       image: product.image,
     });
-  };
+  }, [addItem]);
 
   const showEmpty = !loading && !error && products.length === 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -86,7 +87,7 @@ export default function UsedPage() {
         </p>
       </div>
 
-      <AdvancedFilterBar
+      <OptimizedFilterBar
         query={q}
         onQueryChange={setQ}
         searchPlaceholder="VD: iPhone cu, Galaxy secondhand..."
@@ -118,37 +119,11 @@ export default function UsedPage() {
 
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {products.map((product) => (
-          <div
+          <ProductCard
             key={product.id}
-            className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden hover:border-blue-500/70 transition"
-          >
-            <Link to={`/product/${product.id}`} className="block aspect-[4/3] bg-slate-900">
-              <img loading="lazy"
-                src={product.image}
-                alt={product.name}
-                className="w-full h-full object-cover transition duration-300 hover:scale-105"
-              />
-            </Link>
-
-            <div className="p-4 space-y-2">
-              <p className="text-xs uppercase text-slate-400">
-                {product.brand || product.category || "Used"}
-              </p>
-              <Link to={`/product/${product.id}`}>
-                <p className="text-sm font-semibold line-clamp-2 hover:text-blue-400 transition">
-                  {product.name}
-                </p>
-              </Link>
-              <p className="text-sm font-bold text-blue-400">{formatPrice(product.price)}</p>
-
-              <button
-                onClick={() => handleAdd(product)}
-                className="mt-2 inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-xs font-medium"
-              >
-                Thêm vào giỏ hàng
-              </button>
-            </div>
-          </div>
+            product={{ ...product, badge: "Used" }}
+            onAddToCart={handleAdd}
+          />
         ))}
       </div>
 

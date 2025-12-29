@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { FiShoppingCart } from "react-icons/fi";
 import { useCart } from "../context/CartContext";
-import { useProducts } from "../hooks/useProducts";
-import AdvancedFilterBar from "../components/filters/AdvancedFilterBar";
+import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import ProductCard from "../components/ProductCard";
+import OptimizedFilterBar from "../components/OptimizedFilterBar";
 import Pagination from "../components/Pagination";
 import { BRAND_OPTIONS, SORT_OPTIONS, getSortConfig } from "../constants/filterOptions";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
@@ -23,7 +24,7 @@ const TOP_RATED_SORTS = [
 ];
 
 const PAGE_SIZE = 12;
-const CACHE_TTL_MS = 60000;
+const CACHE_TTL_MS = 300000;
 
 export default function TopRatedPage() {
   const { addItem } = useCart();
@@ -44,7 +45,7 @@ export default function TopRatedPage() {
     setPage(1);
   }, [debouncedKeyword, brand, normalizedMin, normalizedMax, sort]);
 
-  const { products, loading, error, totalCount } = useProducts({
+  const { products, loading, error, totalCount } = usePrismaProducts({
     orderBy: sortConfig.orderBy,
     ascending: sortConfig.ascending,
     keyword: debouncedKeyword || undefined,
@@ -68,7 +69,7 @@ export default function TopRatedPage() {
     setSort(TOP_RATED_SORTS[0].value);
   };
 
-  const handleAdd = (p) => {
+  const handleAdd = useCallback((p) => {
     addItem({
       id: `top-${p.id}`,
       productId: p.id,
@@ -76,7 +77,7 @@ export default function TopRatedPage() {
       price: Number(p.price),
       image: p.image,
     });
-  };
+  }, [addItem]);
 
   const showEmpty = !loading && !error && products.length === 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -88,7 +89,7 @@ export default function TopRatedPage() {
         <p className="text-sm text-slate-400 mt-1">San pham duoc danh gia cao nhat.</p>
       </div>
 
-      <AdvancedFilterBar
+      <OptimizedFilterBar
         query={q}
         onQueryChange={setQ}
         searchPlaceholder="VD: Laptop, dien thoai..."
@@ -116,43 +117,11 @@ export default function TopRatedPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {products.map((p) => (
-          <div
+          <ProductCard
             key={p.id}
-            className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden relative"
-          >
-            <div className="absolute top-3 left-3 z-10">
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/90 text-white">
-                {p.badge || `Top ${(Number(p.rating || 0)).toFixed(1)}`}
-              </span>
-            </div>
-
-            <Link to={`/product/${p.id}`} className="block h-[380px] bg-slate-900">
-              <img
-                src={p.image}
-                alt={p.name}
-                className="w-full h-full object-cover opacity-80 transition duration-300 hover:opacity-100"
-                loading="lazy"
-              />
-            </Link>
-
-            <div className="p-4 border-t border-slate-800/80">
-              <Link to={`/product/${p.id}`}>
-                <p className="text-sm font-semibold line-clamp-2 hover:text-blue-400 transition">
-                  {p.name}
-                </p>
-              </Link>
-              <p className="mt-1 text-sm font-bold text-blue-400">
-                {formatPrice(p.price)}
-              </p>
-
-              <button
-                onClick={() => handleAdd(p)}
-                className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-xs font-semibold transition"
-              >
-                Them vao gio
-              </button>
-            </div>
-          </div>
+            product={{ ...p, badge: p.badge || `Top ${(Number(p.rating || 0)).toFixed(1)}` }}
+            onAddToCart={handleAdd}
+          />
         ))}
       </div>
 

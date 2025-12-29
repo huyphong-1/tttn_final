@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiCreditCard, FiTruck, FiMapPin, FiUser, FiMail, FiPhone } from 'react-icons/fi';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/usePrismaAuth';
 import { useToast } from '../context/ToastContext';
-import { supabase, createOrderRecord } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import CloudinaryImage from '../components/CloudinaryImage';
 import { recordOrderSuccess } from '../lib/metrics';
 
 const formatPrice = (n) =>
@@ -341,10 +342,12 @@ export default function CheckoutPage() {
             <div className="space-y-4 mb-6">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-3">
-                  <img loading="lazy"
-                    src={item.image}
+                  <CloudinaryImage
+                    publicId={item.image}
                     alt={item.name}
-                    className="w-16 h-16 object-cover rounded-lg"
+                    preset="PRODUCT_THUMB"
+                    className="w-16 h-16 rounded-lg"
+                    loading="lazy"
                   />
                   <div className="flex-1">
                     <h3 className="text-white font-medium text-sm line-clamp-2">{item.name}</h3>

@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { useProducts } from "../hooks/useProducts";
-import AdvancedFilterBar from "../components/filters/AdvancedFilterBar";
+import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import ProductCard from "../components/ProductCard";
+import OptimizedFilterBar from "../components/OptimizedFilterBar";
 import Pagination from "../components/Pagination";
 import { BRAND_OPTIONS, SORT_OPTIONS, getSortConfig } from "../constants/filterOptions";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
@@ -18,7 +19,7 @@ const toNumberOrNull = (value) => {
 };
 
 const PAGE_SIZE = 12;
-const CACHE_TTL_MS = 60000;
+const CACHE_TTL_MS = 300000;
 
 export default function AccessoriesPage() {
   const { addItem } = useCart();
@@ -39,7 +40,7 @@ export default function AccessoriesPage() {
     setPage(1);
   }, [debouncedKeyword, brand, normalizedMin, normalizedMax, sort]);
 
-  const { products, loading, error, totalCount } = useProducts({
+  const { products, loading, error, totalCount } = usePrismaProducts({
     inCategory: ["accessory", "accessories"],
     keyword: debouncedKeyword || undefined,
     brand,
@@ -64,7 +65,7 @@ export default function AccessoriesPage() {
     setSort(SORT_OPTIONS[0].value);
   };
 
-  const handleAddToCart = (acc) => {
+  const handleAddToCart = useCallback((acc) => {
     addItem({
       id: `acc-${acc.id}`,
       productId: acc.id,
@@ -72,7 +73,7 @@ export default function AccessoriesPage() {
       price: Number(acc.price),
       image: acc.image,
     });
-  };
+  }, [addItem]);
 
   const showEmpty = !loading && !error && products.length === 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -81,7 +82,7 @@ export default function AccessoriesPage() {
     <main className="max-w-6xl mx-auto px-4 py-10 md:py-12">
       <h1 className="text-2xl md:text-3xl font-semibold mb-2">Tat ca phu kien</h1>
 
-      <AdvancedFilterBar
+      <OptimizedFilterBar
         query={q}
         onQueryChange={setQ}
         searchPlaceholder="VD: AirPods, sac nhanh..."
@@ -109,30 +110,11 @@ export default function AccessoriesPage() {
 
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {products.map((acc) => (
-          <div
+          <ProductCard
             key={acc.id}
-            className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden hover:border-blue-500/70 transition"
-          >
-            <Link to={`/product/${acc.id}`} className="block aspect-[4/3] bg-slate-900">
-              <img loading="lazy"
-                src={acc.image}
-                alt={acc.name}
-                className="w-full h-full object-cover transition duration-300 hover:scale-105"
-              />
-            </Link>
-
-            <div className="p-4 space-y-2">
-              <p className="text-sm font-semibold">{acc.name}</p>
-              <p className="text-sm font-bold text-blue-400">{formatPrice(acc.price)}</p>
-
-              <button
-                onClick={() => handleAddToCart(acc)}
-                className="mt-2 inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-xs font-medium"
-              >
-                Them vao gio
-              </button>
-            </div>
-          </div>
+            product={{ ...acc, badge: "Accessory" }}
+            onAddToCart={handleAddToCart}
+          />
         ))}
       </div>
 

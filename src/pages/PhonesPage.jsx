@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { useProducts } from "../hooks/useProducts";
-import AdvancedFilterBar from "../components/filters/AdvancedFilterBar";
+import { usePrismaProducts } from "../hooks/usePrismaProducts";
+import ProductCard from "../components/ProductCard";
+import OptimizedFilterBar from "../components/OptimizedFilterBar";
 import Pagination from "../components/Pagination";
 import { BRAND_OPTIONS, SORT_OPTIONS, getSortConfig } from "../constants/filterOptions";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
@@ -18,7 +19,7 @@ const toNumberOrNull = (value) => {
 };
 
 const PAGE_SIZE = 12;
-const CACHE_TTL_MS = 60000;
+const CACHE_TTL_MS = 300000;
 
 export default function PhonesPage() {
   const { addItem } = useCart();
@@ -39,7 +40,7 @@ export default function PhonesPage() {
     setPage(1);
   }, [debouncedKeyword, brand, normalizedMin, normalizedMax, sort]);
 
-  const { products, loading, error, totalCount } = useProducts({
+  const { products, loading, error, totalCount } = usePrismaProducts({
     inCategory: ["phone", "phones"],
     keyword: debouncedKeyword || undefined,
     brand,
@@ -65,7 +66,7 @@ export default function PhonesPage() {
     setSort(SORT_OPTIONS[0].value);
   };
 
-  const handleAdd = (p) => {
+  const handleAdd = useCallback((p) => {
     addItem({
       id: `phone-${p.id}`,
       productId: p.id,
@@ -73,7 +74,7 @@ export default function PhonesPage() {
       price: p.price,
       image: p.image,
     });
-  };
+  }, [addItem]);
 
   const showEmpty = !loading && !error && products.length === 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -85,7 +86,7 @@ export default function PhonesPage() {
         <p className="text-sm text-slate-400 mt-1">Flagship mới nhất, thu cũ, đổi mới hỗ trợ lên tới 40%.</p>
       </div>
 
-      <AdvancedFilterBar
+      <OptimizedFilterBar
         query={q}
         onQueryChange={setQ}
         searchPlaceholder="VD: iPhone 15, Galaxy S24..."
@@ -113,37 +114,11 @@ export default function PhonesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {products.map((p) => (
-          <div
+          <ProductCard
             key={p.id}
-            className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
-          >
-            <Link to={`/product/${p.id}`} className="block h-[380px] bg-slate-900">
-              <img
-                src={p.image}
-                alt={p.name}
-                className="w-full h-full object-cover opacity-80 transition duration-300 hover:opacity-100"
-                loading="lazy"
-              />
-            </Link>
-
-            <div className="p-4 border-t border-slate-800/80">
-              <Link to={`/product/${p.id}`}>
-                <p className="text-sm font-semibold line-clamp-2 hover:text-blue-400 transition">
-                  {p.name}
-                </p>
-              </Link>
-              <p className="text-sm font-bold text-blue-400 mt-1">
-                {formatPrice(p.price)}
-              </p>
-
-              <button
-                onClick={() => handleAdd(p)}
-                className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-xs font-semibold transition"
-              >
-                Thêm vào giỏ hàng
-              </button>
-            </div>
-          </div>
+            product={p}
+            onAddToCart={handleAdd}
+          />
         ))}
       </div>
 

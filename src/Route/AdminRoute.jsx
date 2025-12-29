@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/usePrismaAuth";
 
 export default function AdminRoute({ children }) {
   const { user, role, loading } = useAuth(); // role phải có trong AuthContext

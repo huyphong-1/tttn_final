@@ -11,6 +11,7 @@ import {
   FiFileText,
   FiShoppingCart,
 } from "react-icons/fi";
+import CloudinaryImage from "../components/CloudinaryImage";
 
 const formatPrice = (n) =>
   Number(n || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
@@ -176,10 +177,12 @@ export default function PaymentConfirmationPage() {
           <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
             {order.items?.map((item) => (
               <div key={item.id} className="flex gap-3 border border-slate-700 rounded-xl p-3">
-                <img loading="lazy"
-                  src={item.image}
+                <CloudinaryImage
+                  publicId={item.image}
                   alt={item.name}
-                  className="w-16 h-16 object-cover rounded-lg"
+                  preset="PRODUCT_THUMB"
+                  className="w-16 h-16 rounded-lg"
+                  loading="lazy"
                 />
                 <div className="flex-1">
                   <p className="text-white text-sm font-medium line-clamp-2">{item.name}</p>

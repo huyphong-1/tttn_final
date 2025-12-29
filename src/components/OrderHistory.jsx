@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/usePrismaAuth';
 import { useToast } from '../context/ToastContext';
 import { getOrders, getOrdersByUser } from '../lib/supabase';
 
