@@ -36,8 +36,7 @@ export const useProductManagement = () => {
 
       const data = await response.json();
       console.log('[useProductManagement] API Response:', data);
-      
-      // API trả về format { data: [...], count: totalCount, pagination: {...} }
+
       setProducts(data.data || []);
       setTotalCount(data.count || 0);
       
@@ -51,7 +50,6 @@ export const useProductManagement = () => {
     }
   }, [currentPage, pageSize, searchTerm, filterCategory, showError]);
 
-  // Create new product
   const createProduct = useCallback(async (productData) => {
     try {
       setSaving(true);
@@ -232,7 +230,7 @@ export const useProductManagement = () => {
     // Handlers
     handleSearch,
     handleCategoryFilter,
-    handlePageChange,
-    handlePageSizeChange
+    handlePageSizeChange,
+    handlePageChange
   };
 };
