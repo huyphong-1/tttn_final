@@ -37,9 +37,9 @@ export const useProductManagement = () => {
       const data = await response.json();
       console.log('[useProductManagement] API Response:', data);
       
-      // API trả về format { data: [...] } thay vì { products: [...] }
+      // API trả về format { data: [...], count: totalCount, pagination: {...} }
       setProducts(data.data || []);
-      setTotalCount(data.data?.length || 0);
+      setTotalCount(data.count || 0);
       
     } catch (error) {
       console.error('[useProductManagement] Fetch error:', error);
