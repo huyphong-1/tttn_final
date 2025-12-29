@@ -2,6 +2,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import App from "./App";
 
 // Create minimal App component directly in main.jsx
 const MinimalApp = () => {
@@ -74,6 +75,6 @@ const MinimalApp = () => {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <MinimalApp />
+    <App />
   </React.StrictMode>
 );
