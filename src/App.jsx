@@ -2,7 +2,7 @@ import React, { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 
-// Pages
+// Debug pages
 import TestPage from "./pages/TestPage";
 import SimpleTest from "./pages/SimpleTest";
 
@@ -16,9 +16,7 @@ const BestSellingPage = React.lazy(() => import("./pages/BestSellingPage"));
 const TopRatedPage = React.lazy(() => import("./pages/TopRatedPage"));
 const CartPage = React.lazy(() => import("./pages/CartPage"));
 const CheckoutPage = React.lazy(() => import("./pages/CheckoutPage"));
-const PaymentConfirmationPage = React.lazy(() =>
-  import("./pages/PaymentConfirmationPage")
-);
+const PaymentConfirmationPage = React.lazy(() => import("./pages/PaymentConfirmationPage"));
 const LoginPage = React.lazy(() => import("./pages/LoginPage"));
 const RegisterPage = React.lazy(() => import("./pages/RegisterPage"));
 const ProductDetailPage = React.lazy(() => import("./pages/ProductDetailPage"));
@@ -32,9 +30,7 @@ import { PERMISSIONS } from "./config/permissions";
 
 // Admin pages
 const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
-const ProductManagement = React.lazy(() =>
-  import("./pages/admin/ProductManagement")
-);
+const ProductManagement = React.lazy(() => import("./pages/admin/ProductManagement"));
 const OrderManagement = React.lazy(() => import("./pages/admin/OrderManagement"));
 const UserManagement = React.lazy(() => import("./pages/admin/UserManagement"));
 const ProfitManagement = React.lazy(() => import("./pages/admin/ProfitManagement"));
@@ -58,12 +54,10 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
           <div className="text-center p-8">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Có lỗi xảy ra</h1>
-            <p className="text-gray-600 mb-4">
-              Vui lòng refresh trang hoặc liên hệ hỗ trợ
-            </p>
+            <h1 className="text-2xl font-bold text-red-400 mb-4">Có lỗi xảy ra</h1>
+            <p className="text-slate-300 mb-4">Vui lòng refresh trang hoặc liên hệ hỗ trợ</p>
             <button
               onClick={() => window.location.reload()}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
@@ -84,17 +78,17 @@ export default function App() {
     <ErrorBoundary>
       <Suspense
         fallback={
-          <div className="min-h-screen flex items-center justify-center">
+          <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500" />
           </div>
         }
       >
         <Routes>
-          {/* Debug pages */}
+          {/* Debug pages (no Layout) */}
           <Route path="/simple" element={<SimpleTest />} />
           <Route path="/test" element={<TestPage />} />
 
-          {/* Layout routes */}
+          {/* ✅ Everything else goes through Layout (Navbar + Footer + dark bg) */}
           <Route element={<Layout />}>
             {/* Home */}
             <Route index element={<HomePage />} />
@@ -111,6 +105,38 @@ export default function App() {
             <Route path="/top-rated" element={<TopRatedPage />} />
             <Route path="/cart" element={<CartPage />} />
 
+            {/* Auth (đưa vào Layout để đồng bộ UI) */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+
+            {/* User Profile */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <UserProfile />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Checkout */}
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute>
+                  <CheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/confirmation"
+              element={
+                <ProtectedRoute>
+                  <PaymentConfirmationPage />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Order history */}
             <Route
               path="/order-history"
@@ -120,88 +146,52 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Admin routes */}
+            <Route
+              path="/admin"
+              element={
+                <PermissionRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
+                  <AdminDashboard />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/admin/products"
+              element={
+                <PermissionRoute permission={PERMISSIONS.PRODUCT_MANAGE}>
+                  <ProductManagement />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/admin/cart/*"
+              element={
+                <PermissionRoute permission={PERMISSIONS.ORDER_MANAGE}>
+                  <OrderManagement />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/admin/user"
+              element={
+                <PermissionRoute permission={PERMISSIONS.USER_MANAGE}>
+                  <UserManagement />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/admin/profit"
+              element={
+                <PermissionRoute permission={PERMISSIONS.ANALYTICS_VIEW}>
+                  <ProfitManagement />
+                </PermissionRoute>
+              }
+            />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-
-          {/* Auth */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-
-          {/* User Profile */}
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <UserProfile />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Checkout */}
-          <Route
-            path="/checkout"
-            element={
-              <ProtectedRoute>
-                <CheckoutPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/checkout/confirmation"
-            element={
-              <ProtectedRoute>
-                <PaymentConfirmationPage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Admin (giữ nguyên path cũ của bạn) */}
-          <Route
-            path="/admin"
-            element={
-              <PermissionRoute permission={PERMISSIONS.DASHBOARD_VIEW}>
-                <AdminDashboard />
-              </PermissionRoute>
-            }
-          />
-
-          <Route
-            path="/admin/products"
-            element={
-              <PermissionRoute permission={PERMISSIONS.PRODUCT_MANAGE}>
-                <ProductManagement />
-              </PermissionRoute>
-            }
-          />
-
-          <Route
-            path="/admin/cart/*"
-            element={
-              <PermissionRoute permission={PERMISSIONS.ORDER_MANAGE}>
-                <OrderManagement />
-              </PermissionRoute>
-            }
-          />
-
-          <Route
-            path="/admin/user"
-            element={
-              <PermissionRoute permission={PERMISSIONS.USER_MANAGE}>
-                <UserManagement />
-              </PermissionRoute>
-            }
-          />
-
-          <Route
-            path="/admin/profit"
-            element={
-              <PermissionRoute permission={PERMISSIONS.ANALYTICS_VIEW}>
-                <ProfitManagement />
-              </PermissionRoute>
-            }
-          />
-
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>
